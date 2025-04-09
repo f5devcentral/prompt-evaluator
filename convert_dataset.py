@@ -54,9 +54,22 @@ if __name__ == "__main__":
     print("Dataset Converter")
     print("=================")
     
+    # Define the datasets directory
+    datasets_dir = "datasets"
+    
+    # Check if the datasets directory exists
+    if not os.path.exists(datasets_dir):
+        print(f"Note: '{datasets_dir}' directory not found. It will be created if you save a file there.")
+    
     # Ask for input file
     while True:
         input_file = input("Enter the path to the input CSV file: ").strip()
+        
+        # If the input file is in the datasets directory, suggest the full path
+        if not os.path.dirname(input_file) and os.path.exists(os.path.join(datasets_dir, input_file)):
+            input_file = os.path.join(datasets_dir, input_file)
+            print(f"Using file from datasets directory: {input_file}")
+        
         if os.path.exists(input_file):
             break
         else:
@@ -67,6 +80,15 @@ if __name__ == "__main__":
     if not output_file:
         output_file = "converted_dataset.csv"
         print(f"Using default output filename: {output_file}")
+    
+    # If the output file doesn't have a directory specified, suggest saving to datasets
+    if not os.path.dirname(output_file):
+        datasets_output = os.path.join(datasets_dir, output_file)
+        save_to_datasets = input(f"Save output to '{datasets_output}'? (y/n): ").strip().lower()
+        if save_to_datasets == 'y':
+            output_file = datasets_output
+            # Create the datasets directory if it doesn't exist
+            os.makedirs(datasets_dir, exist_ok=True)
     
     # Convert the dataset
     convert_dataset(input_file, output_file) 

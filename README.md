@@ -98,11 +98,11 @@ Example:
 
 ### Sample Datasets
 
-The project includes several sample datasets for testing and demonstration:
+The project includes several sample datasets for testing and demonstration, located in the `datasets` directory:
 
-1. **prompt_inject_dataset.csv**: Contains examples of prompt injection attempts
-2. **pii_dataset.csv**: Contains examples of personally identifiable information
-3. **fin_advice_dataset.csv**: Contains examples of financial advice prompts that may or may not require flagging
+1. **datasets/prompt_inject_dataset.csv**: Contains examples of prompt injection attempts
+2. **datasets/pii_dataset.csv**: Contains examples of personally identifiable information
+3. **datasets/fin_advice_dataset.csv**: Contains examples of financial advice prompts that may or may not require flagging
 
 You can use these datasets to test the evaluator or as templates for creating your own datasets. To convert your own dataset to the required format, use the dataset conversion tool described below.
 
@@ -120,6 +120,7 @@ The script will:
 1. Prompt you for the path to your input CSV file
 2. Ask for the desired output file name
 3. Convert the data to the required format: `"prompt text"|expected_result`
+4. Suggest saving the output file to the `datasets` directory
 
 #### Input Format Requirements
 
