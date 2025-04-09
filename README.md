@@ -78,6 +78,31 @@ python prompt_evaluator.py --input my_dataset.csv --lines 100 --output results.c
 python prompt_evaluator.py -i my_dataset.csv -l 50 -o results.csv
 ```
 
+### Running the Evaluator with Datasets in the Datasets Folder
+
+To run the evaluator against datasets located in the `datasets` folder, specify the path to the dataset in the `--input` or `-i` argument:
+
+```bash
+# Using the prompt injection dataset
+python prompt_evaluator.py --input datasets/prompt_inject_dataset.csv
+
+# Using the PII dataset
+python prompt_evaluator.py --input datasets/pii_dataset.csv
+
+# Using the financial advice dataset
+python prompt_evaluator.py --input datasets/fin_advice_dataset.csv
+```
+
+You can also use the optional arguments with datasets in the `datasets` folder:
+
+```bash
+# Process first 100 lines of a dataset in the datasets folder
+python prompt_evaluator.py --input datasets/your_dataset.csv --lines 100 --output results.csv
+
+# Using short form arguments
+python prompt_evaluator.py -i datasets/your_dataset.csv -l 50 -o results.csv
+```
+
 ### Input File Format
 
 The input CSV file should have the following format:
