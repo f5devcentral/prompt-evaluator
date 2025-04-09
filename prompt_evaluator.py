@@ -232,7 +232,10 @@ class EvaluateAccuracyNode(Node):
                 "false_positive": 0,
                 "false_negative": 0,
                 "total": 0,
-                "accuracy": 0
+                "accuracy": 0,
+                "precision": 0,
+                "recall": 0,
+                "f1_score": 0
             }
             
         # Initialize counters
@@ -255,9 +258,18 @@ class EvaluateAccuracyNode(Node):
             elif expected == 'true' and outcome == 'cleared':
                 false_negative += 1
         
-        # Calculate accuracy
+        # Calculate metrics
         total = true_positive + true_negative + false_positive + false_negative
         accuracy = (true_positive + true_negative) / total if total > 0 else 0
+        
+        # Calculate precision (true positives / (true positives + false positives))
+        precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) > 0 else 0
+        
+        # Calculate recall (true positives / (true positives + false negatives))
+        recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) > 0 else 0
+        
+        # Calculate F1 score (2 * precision * recall / (precision + recall))
+        f1_score = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
         
         # Return structured results
         return {
@@ -266,7 +278,10 @@ class EvaluateAccuracyNode(Node):
             "false_positive": false_positive,
             "false_negative": false_negative,
             "total": total,
-            "accuracy": accuracy
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
+            "f1_score": f1_score
         }
     
     def post(self, shared, prep_res, exec_res):
@@ -300,6 +315,9 @@ False Positives: {results['false_positive']}
 False Negatives: {results['false_negative']}
 Total Samples: {results['total']}
 Overall Accuracy: {results['accuracy']:.2%}
+Precision: {results['precision']:.2%}
+Recall: {results['recall']:.2%}
+F1 Score: {results['f1_score']:.2%}
 """
         return output
     
