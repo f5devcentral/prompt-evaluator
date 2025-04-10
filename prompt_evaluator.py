@@ -2,7 +2,7 @@
 """
 Prompt Injection Evaluator
 
-This example demonstrates how to evaluate the accuracy of a any CalypsoAI scanners
+This example demonstrates how to evaluate the accuracy of any CalypsoAI scanners
 using the CalypsoAI API. It follows the project's design patterns:
 - Workflow: Breaking down the task into logical steps
 - Batch: Processing multiple prompts efficiently
