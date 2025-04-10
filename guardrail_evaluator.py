@@ -51,18 +51,42 @@ def guardrail_scan(prompt):
         # Calculate elapsed time
         elapsed_time = time.time() - start_time
         
-        # Check if any PII entities were detected
-        has_pii = False
+        # Check if any violations were detected
+        is_flagged = False
+        
+        # Check for PII entities
         if "assessments" in response and response["assessments"]:
             for assessment in response["assessments"]:
+                # Check for PII violations
                 if "sensitiveInformationPolicy" in assessment:
                     pii_entities = assessment["sensitiveInformationPolicy"].get("piiEntities", [])
                     if pii_entities:
-                        has_pii = True
+                        is_flagged = True
                         break
+                
+                # Check for other types of violations
+                if "contentPolicy" in assessment:
+                    content_policy = assessment["contentPolicy"]
+                    if content_policy.get("blocked", False):
+                        is_flagged = True
+                        break
+                    
+                    # Check for specific content policy violations
+                    for policy_type in ["hateSpeech", "insults", "misinformation", "sexualContent", "violence"]:
+                        if policy_type in content_policy and content_policy[policy_type].get("blocked", False):
+                            is_flagged = True
+                            break
+        
+        # Check if the action is not NONE
+        if "action" in response and response["action"] != "NONE":
+            is_flagged = True
+        
+        # Check if there are any outputs (which might indicate a violation)
+        if "outputs" in response and response["outputs"]:
+            is_flagged = True
         
         return {
-            'outcome': 'flagged' if has_pii else 'cleared',
+            'outcome': 'flagged' if is_flagged else 'cleared',
             'response_time': elapsed_time,
             'raw_response': response
         }
@@ -79,7 +103,7 @@ class LoadDatasetNode(Node):
     """Loads the dataset from a CSV file."""
     
     def prep(self, shared):
-        input_file = shared.get("input_file", "prompt_inject_dataset.csv")
+        input_file = shared.get("input_file", "datasets/prompt_inject_dataset.csv")
         max_lines = shared.get("max_lines", None)
         return input_file, max_lines
     
@@ -120,7 +144,45 @@ class LoadDatasetNode(Node):
         except FileNotFoundError:
             error_msg = f"Error: Input file '{input_file}' not found. Please check the file path and try again."
             print(error_msg)
-            return []
+            # Try with the datasets directory prefix
+            try:
+                alt_input_file = f"datasets/{input_file}"
+                with open(alt_input_file, 'r') as infile:
+                    for line in infile:
+                        # Check if we've reached the maximum number of lines
+                        if max_lines is not None and line_count >= max_lines:
+                            break
+                            
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        # Split line by | and strip surrounding quotation marks
+                        parts = line.split('|')
+                        if len(parts) < 2:
+                            continue
+                        
+                        prompt = parts[0].strip().strip('"').strip("'")
+                        expected = parts[1].strip().lower() if len(parts) > 1 else "unknown"
+                        
+                        dataset.append({
+                            "prompt": prompt,
+                            "expected": expected,
+                            "original_line": line
+                        })
+                        
+                        line_count += 1
+                
+                print(f"Loaded {len(dataset)} lines from {alt_input_file}")
+                return dataset
+            except FileNotFoundError:
+                error_msg = f"Error: Input file '{alt_input_file}' not found. Please check the file path and try again."
+                print(error_msg)
+                return []
+            except Exception as e:
+                error_msg = f"Error reading file '{alt_input_file}': {str(e)}"
+                print(error_msg)
+                return []
         except Exception as e:
             error_msg = f"Error reading file '{input_file}': {str(e)}"
             print(error_msg)
