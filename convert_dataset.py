@@ -42,11 +42,14 @@ def convert_dataset(input_file, output_file):
                 
             prompt, pii = row[0], row[1]
             
+            # Replace newlines with spaces and strip extra whitespace
+            prompt = ' '.join(prompt.split())
+            
             # Convert True/False to true/false (lowercase)
             pii_value = "true" if pii.lower() == "true" else "false"
             
-            # Write in the format: "prompt"|true/false
-            outfile.write(f'"{prompt}"|{pii_value}\n')
+            # Write in the format: """prompt"""|true/false
+            outfile.write(f'"""{prompt}"""|{pii_value}\n')
     
     print(f"Conversion complete. Output written to {output_file}")
 
