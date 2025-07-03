@@ -77,6 +77,50 @@ The CalypsoAI prompt evaluator (`prompt_evaluator.py`) can be used with any inpu
 python prompt_evaluator.py --input <input_file> [--lines N] [--output <output_file>]
 ```
 
+### CalypsoAI Prompts API Evaluator
+
+The CalypsoAI Prompts API evaluator (`prompt_evaluator_prompts.py`) is an advanced evaluation script that uses the `/prompts` API endpoint. It provides detailed output, including:
+- True/False Positives and Negatives (confusion matrix)
+- Accuracy, Precision, Recall, F1 Score
+- Outcome distribution
+- Latency statistics (average, min, max, sample prompts)
+- Full LLM responses and scanner results (in the CSV output)
+
+This script is ideal for users who want to:
+- See richer information from the CalypsoAI platform (including LLM responses)
+- Analyze scanner performance in more detail
+- Compare results with the standard prompt evaluator
+
+#### Usage
+
+```bash
+python prompt_evaluator_prompts.py --input <input_file> [--max-lines N] [--output <output_file>]
+```
+
+#### Arguments
+- `--input` or `-i`: (Optional) Path to the input CSV file (default: `prompt_inject_dataset.csv`)
+- `--max-lines` or `-m`: (Optional) Maximum number of lines to process from the dataset
+- `--output` or `-o`: (Optional) Output file name for results (default: `prompts_results.csv`)
+
+#### Example Commands
+
+```bash
+# Evaluate all prompts in a dataset using the Prompts API
+python prompt_evaluator_prompts.py --input datasets/prompt_inject_dataset.csv
+
+# Evaluate only the first 100 prompts and save to a custom output file
+python prompt_evaluator_prompts.py --input datasets/prompt_inject_dataset.csv --max-lines 100 --output my_prompts_results.csv
+
+# Using short form arguments
+python prompt_evaluator_prompts.py -i datasets/prompt_inject_dataset.csv -m 50 -o my_prompts_results.csv
+```
+
+#### Output
+- Prints a detailed summary to the console (confusion matrix, accuracy, F1, latency, etc.)
+- Saves a CSV file with all prompt results, including LLM responses and scanner results
+
+> **Note:** This script requires the same environment variables as the standard evaluator. Make sure your `.env` file is set up as described above.
+
 ### AWS Bedrock Guardrail Evaluator
 
 The Guardrail evaluator (`guardrail_evaluator.py`) works similarly but uses the AWS Bedrock Guardrail API:
