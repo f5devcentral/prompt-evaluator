@@ -16,6 +16,28 @@ This project provides a tool for evaluating the effectiveness of AI-powered scan
 - **Line Limit Control**: Option to process only a subset of the dataset
 - **Multiple Scanner Support**: Evaluate prompts using both CalypsoAI and AWS Bedrock Guardrail
 
+## What's New
+
+🚀 **Latest Features Added:**
+
+### Enhanced Evaluation Capabilities
+- **CalypsoAI Prompts API Evaluator** (`prompt_evaluator_prompts.py`) - Advanced evaluation with richer output including LLM responses and detailed metrics
+- **AWS Bedrock Guardrail Evaluator** (`guardrail_evaluator.py`) - Support for AWS Bedrock Guardrail API evaluation
+- **Evaluate Existing Results** (`evaluate_existing_results.py`) - Calculate accuracy metrics from previously generated CSV results
+
+### Dataset Management Tools
+- **Hugging Face Dataset Downloader** (`download_hf_datasets.py`) - Download and convert datasets from Hugging Face Hub
+- **Dataset Conversion Tool** (`convert_dataset.py`) - Convert your existing CSV datasets to the required format
+- **New Sample Datasets** - EU AI Act prompts, PII detection, and financial advice datasets
+
+### Browser Extension
+- **Chrome Extension** (`prompt-evaluator-extension/`) - Browser-based prompt evaluation for popular AI platforms
+
+### Improved Workflow
+- Better error handling and troubleshooting guidance
+- Enhanced output formats with detailed metrics and analysis
+- Flexible configuration options for different use cases
+
 ## Prerequisites
 
 - Python 3.6+
@@ -129,6 +151,40 @@ The Guardrail evaluator (`guardrail_evaluator.py`) works similarly but uses the 
 python guardrail_evaluator.py --input <input_file> [--lines N] [--output <output_file>]
 ```
 
+### Evaluate Existing Results
+
+The `evaluate_existing_results.py` script allows you to evaluate accuracy metrics from previously generated CSV results without re-scanning prompts. This is useful when you already have scan results and want to quickly calculate accuracy metrics.
+
+```bash
+python evaluate_existing_results.py --input <existing_csv_file>
+```
+
+#### Usage
+
+```bash
+# Evaluate results from a previously generated CSV file
+python evaluate_existing_results.py --input scanned_output.csv
+
+# Evaluate results from a specific output file
+python evaluate_existing_results.py --input my_results.csv
+```
+
+#### Arguments
+
+- `--input` or `-i`: (Required) Path to the existing CSV file containing scan results
+
+#### Output
+
+The script will display:
+- True Positives, True Negatives, False Positives, False Negatives
+- Total Samples
+- Overall Accuracy, Precision, Recall, F1 Score
+
+This is particularly useful when:
+- You have existing scan results and want to quickly calculate metrics
+- You want to re-analyze results without re-running expensive API calls
+- You're debugging evaluation issues
+
 ### Arguments
 
 - `--input` or `-i`: (Required) Path to the input CSV file containing prompts to evaluate
@@ -226,6 +282,95 @@ The project includes several sample datasets for testing and demonstration, loca
 
 You can use these datasets to test the evaluators or as templates for creating your own datasets. To convert your own dataset to the required format, use the dataset conversion tool described below.
 
+### Hugging Face Dataset Downloader
+
+The project includes a Hugging Face dataset downloader (`download_hf_datasets.py`) that allows you to download and convert datasets from Hugging Face Hub for use with the prompt evaluators.
+
+#### Features
+
+- **Popular Dataset Discovery**: List popular datasets suitable for prompt evaluation
+- **Dataset Search**: Search for datasets by keywords
+- **Automatic Format Conversion**: Converts datasets to the required format automatically
+- **Flexible Configuration**: Support for different dataset splits and configurations
+- **Sample Limiting**: Download only a subset of large datasets
+- **Smart Column Detection**: Automatically identifies text and label columns
+
+#### Usage
+
+```bash
+# List popular datasets for prompt evaluation
+python download_hf_datasets.py --list-popular
+
+# Search for datasets
+python download_hf_datasets.py --search "sentiment"
+
+# Download a specific dataset
+python download_hf_datasets.py --dataset "imdb" --max-samples 1000
+
+# Download with custom output name
+python download_hf_datasets.py --dataset "squad" --output "my_squad.csv"
+
+# Download specific split and configuration
+python download_hf_datasets.py --dataset "glue" --config "sst2" --split "train"
+
+# List available splits for a dataset
+python download_hf_datasets.py --list-splits "imdb"
+
+# Download test split specifically
+python download_hf_datasets.py --dataset "imdb" --split "test" --max-samples 1000
+
+# Specify label column for malicious prompts dataset
+python download_hf_datasets.py --dataset "codesagar/malicious-llm-prompts-v4" --label-column "malicious"
+
+# Handle numeric labels (0=false, 1=true)
+python download_hf_datasets.py --dataset "xTRam1/safe-guard-prompt-injection" --label-column "label"
+
+# Mark all samples as true (no label column)
+python download_hf_datasets.py --dataset "some-dataset" --no-label
+
+# Show detailed information about a dataset
+python download_hf_datasets.py --info "imdb"
+```
+
+#### Arguments
+
+- `--dataset` or `-d`: Name of the Hugging Face dataset to download
+- `--config` or `-c`: Dataset configuration name (if applicable)
+- `--split` or `-s`: Dataset split to download (default: train)
+- `--max-samples` or `-m`: Maximum number of samples to download
+- `--output` or `-o`: Output filename (auto-generated if not provided)
+- `--output-dir`: Output directory (default: datasets)
+- `--list-popular`: List popular datasets for prompt evaluation
+- `--search`: Search for datasets by query
+- `--info`: Show detailed information about a dataset
+- `--list-splits`: List available splits for a dataset
+- `--label-column`: Name of the column to use as ground truth labels (e.g., 'malicious', 'label', 'target')
+- `--no-label`: Mark all samples as 'true' (no label column available)
+- `--limit`: Limit number of results for list/search operations
+
+#### Example Workflow
+
+```bash
+# 1. Discover popular datasets
+python download_hf_datasets.py --list-popular
+
+# 2. Search for specific types of datasets
+python download_hf_datasets.py --search "toxicity"
+
+# 3. Get information about a specific dataset
+python download_hf_datasets.py --info "hate_speech18"
+
+# 4. Check available splits for a dataset
+python download_hf_datasets.py --list-splits "imdb"
+
+# 5. Download and convert a dataset (test split) with proper label column
+python download_hf_datasets.py --dataset "xTRam1/safe-guard-prompt-injection" --split "test" --label-column "label" --max-samples 5000 --output "prompt_injection_test.csv"
+
+# 6. Use the downloaded dataset with evaluators
+python prompt_evaluator.py --input datasets/prompt_injection_test.csv
+python guardrail_evaluator.py --input datasets/prompt_injection_test.csv
+```
+
 ### Dataset Conversion Tool
 
 The project includes a dataset conversion tool (`convert_dataset.py`) that helps you convert your existing CSV datasets to the format required by the evaluators.
@@ -277,6 +422,38 @@ The evaluators include robust error handling for common issues:
 - Invalid file formats
 
 When errors occur, the evaluators will display helpful error messages and exit gracefully.
+
+## Troubleshooting
+
+### "No data was processed" Error
+
+If you encounter the "No data was processed. No results to display." error, this typically indicates one of the following issues:
+
+1. **API Response Format Changes**: The CalypsoAI API response format has been updated. The evaluator now handles the new format automatically, but if you're still seeing this error, check that your API credentials are correct.
+
+2. **Dataset Format Issues**: Ensure your input CSV file follows the correct format:
+   ```
+   "prompt text"|expected_result
+   ```
+   The expected result should be "true" or "false" without extra quotes.
+
+3. **Environment Variables**: Verify that your `.env` file contains the correct API credentials:
+   ```
+   CALYPSOAI_URL=https://calypsoai.app
+   CALYPSOAI_TOKEN=your_api_token_here
+   ```
+
+4. **API Connectivity**: Check that you can reach the CalypsoAI API and that your token is valid.
+
+### Quick Fix for Existing Results
+
+If you have existing scan results in CSV format, you can use the `evaluate_existing_results.py` script to calculate accuracy metrics without re-scanning:
+
+```bash
+python evaluate_existing_results.py --input your_existing_results.csv
+```
+
+This bypasses the API scanning step and directly calculates accuracy from your existing data.
 
 ## License
 

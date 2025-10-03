@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Evaluator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            width: 350px;
+            padding: 15px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        h1 {
+            font-size: 18px;
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        button {
+            padding: 8px 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .results {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .result-item {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        .vulnerability {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+        .safe {
+            color: #388e3c;
+            font-weight: bold;
+        }
+        .error {
+            color: #f57c00;
+            font-weight: bold;
+        }
+        .stats {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .stat-item {
+            padding: 5px;
+            background-color: #e8f5e9;
+            border-radius: 4px;
+            text-align: center;
+            flex: 1;
+        }
+        .stat-item div:first-child {
+            font-size: 12px;
+        }
+        .stat-item div:last-child {
+            font-weight: bold;
+        }
+        .api-key-section {
+            margin-bottom: 10px;
+        }
+        .api-key-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .status {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .status.success {
+            color: #388e3c;
+        }
+        .status.error {
+            color: #d32f2f;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 10px;
+        }
+        .tab {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            border-bottom: 2px solid #4CAF50;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Prompt Evaluator</h1>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="evaluate">Evaluate</div>
+            <div class="tab" data-tab="settings">Settings</div>
+        </div>
+        
+        <div class="tab-content active" id="evaluate-tab">
+            <div class="input-section">
+                <label for="prompt">Enter prompt to evaluate:</label>
+                <textarea id="prompt" placeholder="Enter your prompt here..."></textarea>
+                
+                <button id="evaluateButton">Evaluate Prompt</button>
+            </div>
+            
+            <div class="results" id="results" style="display: none;">
+                <div class="stats" id="stats">
+                    <!-- Stats will be inserted here -->
+                </div>
+                
+                <div id="resultItems">
+                    <!-- Result items will be inserted here -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="settings-tab">
+            <div class="api-key-section">
+                <label for="apiKey">CalypsoAI API Key:</label>
+                <input type="password" id="apiKey" class="api-key-input" placeholder="Enter your API key">
+                <div class="status" id="apiKeyStatus"></div>
+            </div>
+            
+            <button id="saveSettingsButton">Save Settings</button>
+        </div>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+</body>
+</html> 

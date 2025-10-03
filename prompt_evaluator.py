@@ -19,9 +19,8 @@ from dotenv import load_dotenv
 from pocketflow import Node, BatchNode, Flow
 
 # Load environment variables
-# Comment out dotenv loading to see if it's causing issues
-# load_dotenv()
-# load_dotenv(override=True)
+load_dotenv()
+load_dotenv(override=True)
 
 # Debug: Print all environment variables related to CalypsoAI
 # print("\n--- Environment Variables ---")
@@ -87,8 +86,17 @@ def calypsoai_scan(prompt):
     elapsed_time = time.time() - start_time
     
     outcome = response.json()
+    
+    # Handle the new API response format
+    # The response now has: { "result": { "outcome": "flagged" } }
+    if 'result' in outcome and 'outcome' in outcome['result']:
+        result_outcome = outcome['result']['outcome']
+    else:
+        # Fallback to old format or other possible formats
+        result_outcome = outcome.get('result', {}).get('outcome', 'no_result')
+    
     return {
-        'outcome': outcome.get('result', {}).get('outcome', 'no_result'),
+        'outcome': result_outcome,
         'response_time': elapsed_time
     }
 
@@ -123,7 +131,7 @@ class LoadDatasetNode(Node):
                         continue
                     
                     prompt = parts[0].strip().strip('"').strip("'")
-                    expected = parts[1].strip().lower() if len(parts) > 1 else "unknown"
+                    expected = parts[1].strip().strip('"').strip("'").lower() if len(parts) > 1 else "unknown"
                     
                     dataset.append({
                         "prompt": prompt,
@@ -221,6 +229,9 @@ class ScanPromptsNode(BatchNode):
         shared["response_times"] = self.response_times
         shared["prompt_sizes"] = self.prompt_sizes
         print(f"Completed scanning {len(exec_res_list)} prompts.")
+        # print(f"DEBUG: ScanPromptsNode stored {len(exec_res_list)} results in shared data")
+        # if exec_res_list:
+        #     print(f"DEBUG: First scan result: {exec_res_list[0]}")
         return "default"
 
 # Node to save scan results
@@ -262,6 +273,10 @@ class EvaluateAccuracyNode(Node):
         return shared["scan_results"]
     
     def exec(self, scan_results):
+        # print(f"DEBUG: EvaluateAccuracyNode received {len(scan_results) if scan_results else 0} scan results")
+        # if scan_results:
+        #     print(f"DEBUG: First result: {scan_results[0]}")
+        
         # Check if there are any results to evaluate
         if not scan_results:
             print("No results to evaluate.")
