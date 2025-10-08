@@ -22,13 +22,6 @@ from pocketflow import Node, BatchNode, Flow
 load_dotenv()
 load_dotenv(override=True)
 
-# Debug: Print all environment variables related to CalypsoAI
-# print("\n--- Environment Variables ---")
-# print(f"All env vars: {[k for k in os.environ.keys() if 'CALYPSOAI' in k]}")
-# print(f"Direct access: {os.environ.get('CALYPSOAI_TOKEN')}")
-# print(f"From dotenv: {os.getenv('CALYPSOAI_TOKEN')}")
-# print("----------------------------\n")
-
 # Set up API variables
 base_url = urljoin(os.environ.get("CALYPSOAI_URL", "https://www.us1.calypsoai.app"), "/backend/v1")
 
@@ -43,18 +36,8 @@ except KeyError:
     if not api_key:
         raise ValueError("CALYPSOAI_TOKEN environment variable not found")
 
-# Debug: Compare environment variable with hardcoded key
-# print("\n--- API Key Comparison ---")
-# print(f"Environment API Key: '{api_key}'")
-# print(f"Hardcoded API Key: 'MDE5NjU3Y2EtMWMzNS03MGQxLThjYmItZmRlZDI3OTc4ZGIz/xqZFXATbJ41rbQK5Gm10VmiCK6qw1EuxZ82Xht8sv0PpBiExB9q9uzwsaHk0R3mPL67C0RBGBYaCp0R1WH0Eg'")
-# print(f"Length of env key: {len(api_key)}")
-# print(f"Length of hardcoded key: {len('MDE5NjU3Y2EtMWMzNS03MGQxLThjYmItZmRlZDI3OTc4ZGIz/xqZFXATbJ41rbQK5Gm10VmiCK6qw1EuxZ82Xht8sv0PpBiExB9q9uzwsaHk0R3mPL67C0RBGBYaCp0R1WH0Eg')}")
-# print(f"Are they equal? {api_key == 'MDE5NjU3Y2EtMWMzNS03MGQxLThjYmItZmRlZDI3OTc4ZGIz/xqZFXATbJ41rbQK5Gm10VmiCK6qw1EuxZ82Xht8sv0PpBiExB9q9uzwsaHk0R3mPL67C0RBGBYaCp0R1WH0Eg'}")
-# print("-------------------------\n")
-
 # Utility function to scan a prompt using CalypsoAI
 def calypsoai_scan(prompt):
-    # print(api_key)
     """Scan a prompt using the CalypsoAI API."""
     headers = {
         'Authorization': f'Bearer {api_key}',
