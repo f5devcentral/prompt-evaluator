@@ -11,6 +11,7 @@ This project provides a tool for evaluating the effectiveness of AI-powered scan
   - Confusion matrix (true positives, false positives, true negatives, false negatives)
   - Detailed latency statistics (average, min, max, percentiles)
 - **Structured Output**: Results saved in CSV format for further analysis
+- **False Positives & False Negatives Export**: Automatic export of misclassified prompts to separate CSV files for focused troubleshooting
 - **Workflow-Based Design**: Modular architecture using the PocketFlow framework
 - **Custom Input Support**: Process any CSV file with the appropriate format
 - **Line Limit Control**: Option to process only a subset of the dataset
@@ -24,6 +25,7 @@ This project provides a tool for evaluating the effectiveness of AI-powered scan
 - **CalypsoAI Prompts API Evaluator** (`prompt_evaluator_prompts.py`) - Advanced evaluation with richer output including LLM responses and detailed metrics
 - **AWS Bedrock Guardrail Evaluator** (`guardrail_evaluator.py`) - Support for AWS Bedrock Guardrail API evaluation
 - **Evaluate Existing Results** (`evaluate_existing_results.py`) - Calculate accuracy metrics from previously generated CSV results
+- **False Positives & False Negatives Export** - Automatic export of misclassified prompts to separate CSV files for troubleshooting and analysis
 
 ### Dataset Management Tools
 - **Hugging Face Dataset Downloader** (`download_hf_datasets.py`) - Download and convert datasets from Hugging Face Hub
@@ -99,6 +101,8 @@ The CalypsoAI prompt evaluator (`prompt_evaluator.py`) can be used with any inpu
 python prompt_evaluator.py --input <input_file> [--lines N] [--output <output_file>]
 ```
 
+This evaluator automatically exports False Positives and False Negatives to separate CSV files for troubleshooting.
+
 ### CalypsoAI Prompts API Evaluator
 
 The CalypsoAI Prompts API evaluator (`prompt_evaluator_prompts.py`) is an advanced evaluation script that uses the `/prompts` API endpoint. It provides detailed output, including:
@@ -140,8 +144,43 @@ python prompt_evaluator_prompts.py -i datasets/prompt_inject_dataset.csv -m 50 -
 #### Output
 - Prints a detailed summary to the console (confusion matrix, accuracy, F1, latency, etc.)
 - Saves a CSV file with all prompt results, including LLM responses and scanner results
+- **Automatically exports False Positives and False Negatives** to separate CSV files for troubleshooting
 
 > **Note:** This script requires the same environment variables as the standard evaluator. Make sure your `.env` file is set up as described above.
+
+### False Positives & False Negatives Export
+
+Both evaluators now automatically export misclassified prompts to separate CSV files for focused analysis:
+
+#### What Gets Exported
+
+- **False Positives**: Prompts that were incorrectly flagged as malicious (expected=false, outcome=flagged)
+- **False Negatives**: Prompts that were incorrectly cleared when they should have been flagged (expected=true, outcome=cleared)
+
+#### File Naming
+
+The export files are automatically named based on your output file:
+- If you specify `--output results.csv`, you'll get:
+  - `results.csv` - Main results file
+  - `results_false_positives.csv` - False positives for troubleshooting
+  - `results_false_negatives.csv` - False negatives for troubleshooting
+
+#### Benefits
+
+1. **Focused Analysis**: Quickly identify problematic prompts without filtering through all results
+2. **Troubleshooting**: Understand why certain prompts were misclassified
+3. **Model Improvement**: Use these files to improve training data or adjust thresholds
+4. **Quality Assurance**: Review edge cases that need attention
+
+#### Example Output
+
+When you run an evaluation, you'll see output like:
+```
+Exported 15 false positives to results_false_positives.csv
+Exported 8 false negatives to results_false_negatives.csv
+```
+
+This helps you understand the distribution of errors in your evaluation results.
 
 ### AWS Bedrock Guardrail Evaluator
 
