@@ -364,6 +364,140 @@ class EvaluateAccuracyNode(Node):
         shared["evaluation_results"] = exec_res
         return "default"
 
+# Node to export false positives
+class ExportFalsePositivesNode(Node):
+    """Exports prompts that were marked as false positives to a CSV file."""
+    
+    def prep(self, shared):
+        prompt_results = shared.get("prompt_results", [])
+        output_file = shared.get("output_file", "prompts_results.csv")
+        # Create false positives filename based on output file
+        base_name = output_file.replace('.csv', '')
+        false_positives_file = f"{base_name}_false_positives.csv"
+        return prompt_results, false_positives_file
+    
+    def exec(self, inputs):
+        prompt_results, false_positives_file = inputs
+        
+        if not prompt_results:
+            print("No results to export for false positives.")
+            return false_positives_file
+        
+        false_positives = []
+        for result in prompt_results:
+            expected = result.get("expected", "").lower()
+            outcome = result.get("outcome", "").lower()
+            
+            # Normalize expected values
+            if expected in ['true', 'injection', 'malicious', 'attack']:
+                expected_normalized = 'true'
+            elif expected in ['false', 'benign', 'safe', 'normal']:
+                expected_normalized = 'false'
+            else:
+                expected_normalized = expected
+            
+            # Normalize actual values
+            if outcome in ['flagged', 'blocked']:
+                outcome_normalized = 'flagged'
+            elif outcome == 'cleared':
+                outcome_normalized = 'cleared'
+            else:
+                outcome_normalized = outcome
+            
+            # False positive: expected 'false' but got 'flagged'
+            if expected_normalized == 'false' and outcome_normalized == 'flagged':
+                false_positives.append(result)
+        
+        if not false_positives:
+            print("No false positives found to export.")
+            # Create empty file with header
+            with open(false_positives_file, 'w') as outfile:
+                outfile.write("prompt|expected|outcome|response|response_time|prompt_size|scanner_results|original_line\n")
+            return false_positives_file
+        
+        # Write false positives to CSV
+        with open(false_positives_file, 'w') as outfile:
+            for result in false_positives:
+                response_time = result.get('response_time')
+                response_time_str = f"{response_time:.4f}" if response_time is not None else "N/A"
+                prompt_size = result.get('prompt_size', 'N/A')
+                scanner_results_str = str(result.get('scanner_results', []))
+                outfile.write(f"{result['prompt']}|{result['expected']}|{result['outcome']}|{result.get('response', '')}|{response_time_str}|{prompt_size}|{scanner_results_str}|{result.get('original_line', '')}\n")
+        
+        print(f"Exported {len(false_positives)} false positives to {false_positives_file}")
+        return false_positives_file
+    
+    def post(self, shared, prep_res, exec_res):
+        shared["false_positives_file"] = exec_res
+        return "default"
+
+# Node to export false negatives
+class ExportFalseNegativesNode(Node):
+    """Exports prompts that were marked as false negatives to a CSV file."""
+    
+    def prep(self, shared):
+        prompt_results = shared.get("prompt_results", [])
+        output_file = shared.get("output_file", "prompts_results.csv")
+        # Create false negatives filename based on output file
+        base_name = output_file.replace('.csv', '')
+        false_negatives_file = f"{base_name}_false_negatives.csv"
+        return prompt_results, false_negatives_file
+    
+    def exec(self, inputs):
+        prompt_results, false_negatives_file = inputs
+        
+        if not prompt_results:
+            print("No results to export for false negatives.")
+            return false_negatives_file
+        
+        false_negatives = []
+        for result in prompt_results:
+            expected = result.get("expected", "").lower()
+            outcome = result.get("outcome", "").lower()
+            
+            # Normalize expected values
+            if expected in ['true', 'injection', 'malicious', 'attack']:
+                expected_normalized = 'true'
+            elif expected in ['false', 'benign', 'safe', 'normal']:
+                expected_normalized = 'false'
+            else:
+                expected_normalized = expected
+            
+            # Normalize actual values
+            if outcome in ['flagged', 'blocked']:
+                outcome_normalized = 'flagged'
+            elif outcome == 'cleared':
+                outcome_normalized = 'cleared'
+            else:
+                outcome_normalized = outcome
+            
+            # False negative: expected 'true' but got 'cleared'
+            if expected_normalized == 'true' and outcome_normalized == 'cleared':
+                false_negatives.append(result)
+        
+        if not false_negatives:
+            print("No false negatives found to export.")
+            # Create empty file with header
+            with open(false_negatives_file, 'w') as outfile:
+                outfile.write("prompt|expected|outcome|response|response_time|prompt_size|scanner_results|original_line\n")
+            return false_negatives_file
+        
+        # Write false negatives to CSV
+        with open(false_negatives_file, 'w') as outfile:
+            for result in false_negatives:
+                response_time = result.get('response_time')
+                response_time_str = f"{response_time:.4f}" if response_time is not None else "N/A"
+                prompt_size = result.get('prompt_size', 'N/A')
+                scanner_results_str = str(result.get('scanner_results', []))
+                outfile.write(f"{result['prompt']}|{result['expected']}|{result['outcome']}|{result.get('response', '')}|{response_time_str}|{prompt_size}|{scanner_results_str}|{result.get('original_line', '')}\n")
+        
+        print(f"Exported {len(false_negatives)} false negatives to {false_negatives_file}")
+        return false_negatives_file
+    
+    def post(self, shared, prep_res, exec_res):
+        shared["false_negatives_file"] = exec_res
+        return "default"
+
 # Node to display results
 class DisplayResultsNode(Node):
     """Displays the evaluation results."""
@@ -487,11 +621,13 @@ def create_evaluation_flow():
     send_prompts = SendPromptsNode()
     save_results = SaveResultsNode()
     evaluate_accuracy = EvaluateAccuracyNode()
+    export_false_positives = ExportFalsePositivesNode()
+    export_false_negatives = ExportFalseNegativesNode()
     display_results = DisplayResultsNode()
     latency_stats = LatencyStatsNode()
     
     # Connect nodes in sequence
-    load_dataset >> send_prompts >> save_results >> evaluate_accuracy >> display_results >> latency_stats
+    load_dataset >> send_prompts >> save_results >> evaluate_accuracy >> export_false_positives >> export_false_negatives >> display_results >> latency_stats
     
     # Create flow with the starting node
     return Flow(start=load_dataset)
