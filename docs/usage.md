@@ -49,8 +49,6 @@ python prompt_evaluator_prompts.py --input <input_file> [--max-lines N] [--outpu
 - Full LLM responses and scanner results
 - **🆕 JSON Export**: False positives and false negatives exported in JSON format
 
-> **📊 Understanding Metrics**: For detailed explanations of all evaluation metrics including formulas, interpretations, and best practices, see the [Evaluation Metrics Guide](evaluation-metrics.md).
-
 ### Arguments
 - `--input` or `-i`: Path to the input CSV file (default: `prompt_inject_dataset.csv`)
 - `--max-lines` or `-m`: Maximum number of lines to process
@@ -173,8 +171,6 @@ project/
 
 The results analyzer (`evaluate_existing_results.py`) calculates accuracy metrics from previously generated CSV results:
 
-> **📊 Understanding Results**: For detailed explanations of the metrics displayed (Accuracy, Precision, Recall, F1 Score), see the [Evaluation Metrics Guide](evaluation-metrics.md).
-
 ```bash
 python evaluate_existing_results.py --input <existing_csv_file>
 ```
@@ -237,8 +233,6 @@ Both evaluators automatically export misclassified prompts to separate CSV files
 ### What Gets Exported
 - **False Positives**: Prompts incorrectly flagged as malicious (expected=false, outcome=flagged)
 - **False Negatives**: Prompts incorrectly cleared when they should have been flagged (expected=true, outcome=cleared)
-
-> **📊 Detailed Definitions**: For comprehensive explanations of False Positives, False Negatives, and other evaluation metrics, see the [Evaluation Metrics Guide](evaluation-metrics.md).
 
 ### File Naming
 Export files are automatically named based on your output file:
