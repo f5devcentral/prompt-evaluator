@@ -20,6 +20,35 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 import json
 
+
+def save_dataset_to_file(df: pd.DataFrame, file_path: str, format_type: str) -> None:
+    """Save dataset to file in the specified format."""
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    
+    if format_type == 'json':
+        # Write as JSONL
+        with open(file_path, 'w') as f:
+            for _, row in df.iterrows():
+                json.dump(row.to_dict(), f, ensure_ascii=False)
+                f.write('\n')
+    
+    elif format_type == 'csv':
+        # Write as CSV
+        df.to_csv(file_path, index=False)
+    
+    elif format_type == 'tsv':
+        # Write as TSV
+        df.to_csv(file_path, index=False, sep='\t')
+    
+    elif format_type == 'parquet':
+        # Write as Parquet
+        try:
+            df.to_parquet(file_path, index=False)
+        except ImportError:
+            print("Warning: pandas not available for parquet export. Falling back to JSON.")
+            save_dataset_to_file(df, file_path.replace('.parquet', '.jsonl'), 'json')
+
 try:
     from datasets import load_dataset, get_dataset_infos
     from huggingface_hub import HfApi, list_datasets
@@ -101,7 +130,8 @@ class HFDatasetDownloader:
                         max_samples: Optional[int] = None,
                         output_file: Optional[str] = None,
                         label_column: Optional[str] = None,
-                        no_label: bool = False) -> str:
+                        no_label: bool = False,
+                        output_format: str = "json") -> str:
         """
         Download and convert a Hugging Face dataset.
         
@@ -144,18 +174,29 @@ class HFDatasetDownloader:
             # Generate output filename if not provided
             if not output_file:
                 safe_name = dataset_name.replace("/", "_").replace("-", "_")
-                output_file = f"{safe_name}_{split}.csv"
+                if output_format == 'json':
+                    extension = 'jsonl'
+                elif output_format == 'csv':
+                    extension = 'csv'
+                elif output_format == 'tsv':
+                    extension = 'tsv'
+                elif output_format == 'parquet':
+                    extension = 'parquet'
+                else:
+                    extension = 'jsonl'  # Default fallback
+                output_file = f"{safe_name}_{split}.{extension}"
             
             output_path = self.output_dir / output_file
             
             # Convert to the required format for prompt evaluation
             converted_df = self._convert_to_prompt_format(df, dataset_name, label_column, no_label)
             
-            # Save the dataset
-            converted_df.to_csv(output_path, index=False)
+            # Save the dataset in the specified format
+            save_dataset_to_file(converted_df, output_path, output_format)
             
             print(f"✅ Dataset saved to: {output_path}")
-            print(f"   Converted format: {converted_df.shape}")
+            print(f"   Format: {output_format.upper()} with 'prompt' and 'expected' columns")
+            print(f"   Records: {converted_df.shape[0]} rows, {converted_df.shape[1]} columns")
             
             return str(output_path)
             
@@ -168,7 +209,7 @@ class HFDatasetDownloader:
         """
         Convert a dataset to the format required by prompt evaluators.
         
-        The required format is: "prompt text"|expected_result
+        Uses the new improved dataset format with proper CSV structure.
         """
         print("🔄 Converting to prompt evaluation format...")
         
@@ -227,13 +268,14 @@ class HFDatasetDownloader:
                 # No label column found, default to false
                 expected_result = "false"
             
-            # Format as required: "prompt text"|expected_result
-            converted_data.append(f'"{prompt_text}"|{expected_result}')
+            # Create structured record for new CSV format
+            converted_data.append({
+                'prompt': prompt_text,
+                'expected': expected_result
+            })
         
-        # Create DataFrame with the converted format
-        converted_df = pd.DataFrame({
-            'converted_line': converted_data
-        })
+        # Create DataFrame with the new CSV format
+        converted_df = pd.DataFrame(converted_data)
         
         print(f"   Converted {len(converted_df)} samples")
         return converted_df
@@ -364,11 +406,17 @@ Examples:
   # Search for datasets
   python download_hf_datasets.py --search "sentiment"
   
-  # Download a specific dataset
+  # Download a specific dataset (default JSON format)
   python download_hf_datasets.py --dataset "imdb" --max-samples 1000
   
-  # Download with custom output name
-  python download_hf_datasets.py --dataset "squad" --output "my_squad.csv"
+  # Download with custom output name and format
+  python download_hf_datasets.py --dataset "squad" --output "my_squad.csv" --format csv
+  
+  # Download in different formats
+  python download_hf_datasets.py --dataset "imdb" --format json    # JSONL format (default)
+  python download_hf_datasets.py --dataset "imdb" --format csv    # CSV format
+  python download_hf_datasets.py --dataset "imdb" --format tsv    # TSV format
+  python download_hf_datasets.py --dataset "imdb" --format parquet # Parquet format
   
   # Download specific split and configuration
   python download_hf_datasets.py --dataset "glue" --config "sst2" --split "train"
@@ -444,6 +492,13 @@ Examples:
         help="Mark all samples as 'true' (no label column available)"
     )
     parser.add_argument(
+        "--format", "-f",
+        type=str,
+        default="json",
+        choices=["json", "csv", "tsv", "parquet"],
+        help="Output format for the dataset (default: json)"
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=20,
@@ -472,12 +527,12 @@ Examples:
                 max_samples=args.max_samples,
                 output_file=args.output,
                 label_column=args.label_column,
-                no_label=args.no_label
+                no_label=args.no_label,
+                output_format=args.format
             )
             print(f"\n🎉 Success! Dataset ready for evaluation at: {output_path}")
             print(f"\nYou can now use it with the prompt evaluators:")
             print(f"python prompt_evaluator.py --input {output_path}")
-            print(f"python guardrail_evaluator.py --input {output_path}")
         else:
             parser.print_help()
             

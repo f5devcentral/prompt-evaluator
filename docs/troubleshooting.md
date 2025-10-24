@@ -51,11 +51,6 @@ When errors occur, the evaluators will display helpful error messages and exit g
 - **API Rate Limits**: If you encounter rate limiting, consider processing smaller batches
 - **Token Expiration**: Check that your API token is valid and not expired
 
-### AWS Bedrock Issues
-
-- **Guardrail Configuration**: Verify your Guardrail is properly configured with appropriate policies
-- **AWS Credentials**: Ensure your AWS credentials are properly configured
-- **Region Settings**: Check that you're using the correct AWS region for Bedrock
 
 ## Getting Help
 
