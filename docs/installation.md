@@ -3,8 +3,7 @@
 ## Prerequisites
 
 - Python 3.6+
-- CalypsoAI API access and credentials (for CalypsoAI evaluator)
-- AWS Bedrock access and credentials (for Guardrail evaluator)
+- CalypsoAI API access and credentials
 
 ## Installation Steps
 
@@ -22,13 +21,8 @@
 3. **Set up environment variables:**
    Create a `.env` file in the project root with the following content:
    ```
-   # For CalypsoAI evaluator
    CALYPSOAI_URL=https://calypsoai.app
    CALYPSOAI_TOKEN=your_api_token_here
-
-   # For AWS Bedrock Guardrail evaluator
-   GUARDRAIL_ID=your_guardrail_id
-   GUARDRAIL_VERSION=1
    ```
 
 ## Platform Configuration
@@ -43,14 +37,6 @@ Before running the evaluator, ensure you have configured the appropriate scanner
 
 You can configure your scanners through the CalypsoAI platform's web interface under the Scanner Settings section.
 
-### AWS Bedrock Guardrail Configuration
-
-Before running the Guardrail evaluator, ensure you have:
-
-- Set up an AWS account with access to Bedrock
-- Created a Guardrail in the AWS Bedrock console
-- Configured the Guardrail with appropriate policies (e.g., PII detection)
-- Obtained your Guardrail ID and version
 
 ## Verification
 

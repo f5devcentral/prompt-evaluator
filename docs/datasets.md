@@ -97,7 +97,6 @@ python download_hf_datasets.py --dataset "xTRam1/safe-guard-prompt-injection" --
 
 # 6. Use the downloaded dataset with evaluators
 python prompt_evaluator.py --input datasets/prompt_injection_test.csv
-python guardrail_evaluator.py --input datasets/prompt_injection_test.csv
 ```
 
 ## Dataset Conversion Tool
@@ -142,14 +141,6 @@ python prompt_evaluator.py --input datasets/pii_dataset.csv
 # Using the financial advice dataset with CalypsoAI
 python prompt_evaluator.py --input datasets/fin_advice_dataset.csv
 
-# Using the prompt injection dataset with AWS Bedrock Guardrail
-python guardrail_evaluator.py --input datasets/prompt_inject_dataset.csv
-
-# Using the PII dataset with AWS Bedrock Guardrail
-python guardrail_evaluator.py --input datasets/pii_dataset.csv
-
-# Using the financial advice dataset with AWS Bedrock Guardrail
-python guardrail_evaluator.py --input datasets/fin_advice_dataset.csv
 ```
 
 You can also use the optional arguments with datasets in the `datasets` folder:
@@ -161,9 +152,4 @@ python prompt_evaluator.py --input datasets/your_dataset.csv --lines 100 --outpu
 # Using short form arguments with CalypsoAI
 python prompt_evaluator.py -i datasets/your_dataset.csv -l 50 -o results.csv
 
-# Process first 100 lines of a dataset in the datasets folder using AWS Bedrock Guardrail
-python guardrail_evaluator.py --input datasets/your_dataset.csv --lines 100 --output guardrail_results.csv
-
-# Using short form arguments with AWS Bedrock Guardrail
-python guardrail_evaluator.py -i datasets/your_dataset.csv -l 50 -o guardrail_results.csv
 ```

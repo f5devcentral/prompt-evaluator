@@ -92,7 +92,6 @@ def main():
         
         print(f"\n🎯 You can now use this dataset with the evaluators:")
         print(f"python prompt_evaluator.py --input datasets/imdb_sample.csv")
-        print(f"python guardrail_evaluator.py --input datasets/imdb_sample.csv")
     else:
         print("❌ Sample dataset was not created")
     

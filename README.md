@@ -1,6 +1,41 @@
 # Prompt Evaluator
 
-A comprehensive tool for evaluating AI-powered scanners in detecting various types of content using CalypsoAI API and AWS Bedrock Guardrail.
+A comprehensive tool for evaluating AI-powered scanners in detecting various types of content using CalypsoAI API.
+
+## 🎉 Version 2.0 Released!
+
+**Major Release**: [**v2.0.0**](RELEASE_NOTES_v2.0.md) - October 2025
+
+This major release introduces significant improvements to dataset handling, format support, and tooling. Key highlights include multiple dataset formats (JSONL, CSV, TSV, Parquet), enhanced migration tools, improved Hugging Face integration, and comprehensive documentation updates.
+
+**[📋 View Complete Release Notes](RELEASE_NOTES_v2.0.md)** - Detailed changelog, migration guide, and new features
+
+## 🆕 What's New
+
+### Improved Dataset Formats
+- **Multiple Format Support**: JSONL, CSV, TSV, and Parquet formats
+- **Proper Escaping**: No more issues with special characters (pipes, quotes, newlines)
+- **Metadata Support**: Store IDs, timestamps, categories, and more
+- **Safe Migration**: Convert existing datasets without data loss
+- **Backward Compatibility**: All existing scripts work unchanged
+
+### New Tools
+- **`tools/improved_dataset_converter.py`**: Convert between all formats with validation
+- **`tools/enhanced_dataset_reader.py`**: Unified reader that auto-detects formats
+- **`tools/migrate_datasets.py`**: Batch migration tool for existing datasets
+- **`tools/demo_improved_formats.py`**: Complete demonstration of new features
+
+### Quick Migration
+```bash
+# See your current datasets
+python tools/migrate_datasets.py --list
+
+# Migrate all to JSONL format (recommended)
+python tools/migrate_datasets.py --all --output-format jsonl
+
+# Continue using existing scripts - no changes needed!
+python prompt_evaluator.py --input datasets/my_dataset.jsonl
+```
 
 ## Quick Start
 
@@ -10,12 +45,10 @@ A comprehensive tool for evaluating AI-powered scanners in detecting various typ
    ```
 
 2. **Set up environment variables:**
-   Create a `.env` file with your API credentials:
+   Create a `.env` file with your CalypsoAI API credentials:
    ```
    CALYPSOAI_URL=https://calypsoai.app
    CALYPSOAI_TOKEN=your_api_token_here
-   GUARDRAIL_ID=your_guardrail_id
-   GUARDRAIL_VERSION=1
    ```
 
 3. **Run evaluation:**
@@ -27,17 +60,23 @@ A comprehensive tool for evaluating AI-powered scanners in detecting various typ
 
 - **Flexible Evaluation**: Works with any CSV dataset
 - **Batch Processing**: Efficiently process large datasets
-- **Multiple Scanners**: CalypsoAI and AWS Bedrock Guardrail support
+- **CalypsoAI Integration**: Direct integration with CalypsoAI API
 - **Comprehensive Metrics**: Accuracy, precision, recall, F1 score, latency stats
-- **False Positives/Negatives Export**: Automatic export for troubleshooting
-- **Browser Extension**: Chrome extension for real-time evaluation
+- **False Positives/Negatives Export**: Automatic export in JSON format for easy analysis
 - **Dataset Management**: Download from Hugging Face, convert existing datasets
+- **🆕 Multiple Output Formats**: JSON (default), CSV, TSV, and Parquet support
+- **🆕 Improved Dataset Formats**: Support for JSONL, CSV, TSV, and Parquet formats
+- **🆕 Enhanced Data Handling**: Proper escaping, metadata support, and format validation
+- **🆕 Migration Tools**: Safe migration from legacy pipe-delimited format
 
 ## Documentation
 
+- **[📋 Release Notes v2.0](RELEASE_NOTES_v2.0.md)** - Complete changelog and migration guide
 - **[Installation Guide](docs/installation.md)** - Detailed setup instructions
 - **[Usage Guide](docs/usage.md)** - Complete usage examples and options
 - **[Dataset Management](docs/datasets.md)** - Working with datasets and Hugging Face
+- **[🆕 Improved Dataset Formats](docs/IMPROVED_DATASET_FORMATS.md)** - New dataset formats and migration guide
+- **[🆕 Dataset Tools](tools/README.md)** - New dataset tools and utilities
 - **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 - **[Contributing](docs/contributing.md)** - How to contribute to the project
 
@@ -47,7 +86,6 @@ A comprehensive tool for evaluating AI-powered scanners in detecting various typ
 |-----------|-------------|----------|
 | `prompt_evaluator.py` | Standard CalypsoAI evaluation | General purpose evaluation |
 | `prompt_evaluator_prompts.py` | Advanced CalypsoAI with LLM responses | Detailed analysis with full responses |
-| `guardrail_evaluator.py` | AWS Bedrock Guardrail evaluation | AWS ecosystem integration |
 | `evaluate_existing_results.py` | Calculate metrics from existing results | Re-analyze without re-scanning |
 
 ## Sample Datasets
@@ -58,9 +96,6 @@ The project includes several sample datasets in the `datasets/` folder:
 - `fin_advice_dataset.csv` - Financial advice prompts
 - `eu-ai-act-prompts.csv` - EU AI Act compliance prompts
 
-## Browser Extension
-
-A Chrome extension is available in the `prompt-evaluator-extension/` folder for real-time prompt evaluation on popular AI platforms.
 
 ## License
 

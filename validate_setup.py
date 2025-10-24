@@ -6,7 +6,6 @@ This script validates all prerequisites for running the prompt evaluator applica
 It checks for:
 - Required environment variables
 - Required Python packages
-- AWS credentials
 - CalypsoAI API configuration
 - Input/output file permissions
 - Python version
@@ -16,7 +15,6 @@ It checks for:
 import os
 import sys
 import pkg_resources
-import boto3
 import requests
 import csv
 import argparse
@@ -42,8 +40,7 @@ def check_required_packages():
     required_packages = {
         'requests': '2.31.0',
         'pocketflow': '0.0.1',
-        'python-dotenv': '1.0.0',
-        'boto3': '1.34.0'
+        'python-dotenv': '1.0.0'
     }
     
     missing_packages = []
@@ -82,9 +79,7 @@ def check_environment_variables():
     
     required_vars = {
         'CALYPSOAI_URL': 'CalypsoAI API URL',
-        'CALYPSOAI_TOKEN': 'CalypsoAI API token',
-        'GUARDRAIL_ID': 'AWS Bedrock Guardrail ID',
-        'GUARDRAIL_VERSION': 'AWS Bedrock Guardrail version'
+        'CALYPSOAI_TOKEN': 'CalypsoAI API token'
     }
     
     missing_vars = []
@@ -106,38 +101,6 @@ def check_environment_variables():
     print("✅ Environment variables check passed")
     return True
 
-def check_aws_credentials():
-    """Check if AWS credentials are properly configured."""
-    try:
-        session = boto3.Session()
-        credentials = session.get_credentials()
-        
-        if not credentials:
-            print("❌ AWS credentials check failed")
-            print("   No AWS credentials found")
-            print("\nTo fix:")
-            print("1. Install AWS CLI: https://aws.amazon.com/cli/")
-            print("2. Run 'aws configure' and enter your credentials")
-            print("   - AWS Access Key ID")
-            print("   - AWS Secret Access Key")
-            print("   - Default region name (e.g., us-east-1)")
-            print("   - Default output format (json)")
-            return False
-        
-        # Test Bedrock access
-        bedrock = boto3.client('bedrock-runtime')
-        bedrock.list_foundation_models()
-        
-        print("✅ AWS credentials check passed")
-        return True
-    except Exception as e:
-        print("❌ AWS credentials check failed")
-        print(f"   Error: {str(e)}")
-        print("\nTo fix:")
-        print("1. Ensure you have AWS credentials configured")
-        print("2. Verify you have access to AWS Bedrock")
-        print("3. Check your AWS region settings")
-        return False
 
 def check_calypsoai_api():
     """Check if CalypsoAI API is accessible."""
@@ -280,7 +243,6 @@ def main():
         ("Python Version", check_python_version),
         ("Required Packages", check_required_packages),
         ("Environment Variables", check_environment_variables),
-        ("AWS Credentials", check_aws_credentials),
         ("CalypsoAI API", check_calypsoai_api),
         ("File Permissions", check_file_permissions),
         ("Dataset", lambda: check_dataset(args.dataset))

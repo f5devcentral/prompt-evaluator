@@ -11,9 +11,11 @@ using the CalypsoAI API. It follows the project's design patterns:
 
 import os
 import csv
+import json
 import requests
 import time
 import argparse
+from datetime import datetime
 from urllib.parse import urljoin
 from dotenv import load_dotenv
 from pocketflow import Node, BatchNode, Flow
@@ -83,47 +85,101 @@ def calypsoai_scan(prompt):
         'response_time': elapsed_time
     }
 
+# Import the enhanced dataset reader
+from tools.enhanced_dataset_reader import load_dataset_enhanced
+
+
+def write_results_to_file(data, file_path, format_type):
+    """Write results to file in the specified format."""
+    import os
+    
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    
+    if format_type == 'json':
+        # Write as JSONL
+        with open(file_path, 'w') as f:
+            for record in data:
+                json.dump(record, f, ensure_ascii=False)
+                f.write('\n')
+    
+    elif format_type == 'csv':
+        # Write as CSV
+        if not data:
+            with open(file_path, 'w') as f:
+                f.write("prompt,expected,outcome,response_time,prompt_size,original_line,metadata\n")
+            return
+        
+        with open(file_path, 'w', newline='', encoding='utf-8') as f:
+            fieldnames = ['prompt', 'expected', 'outcome', 'response_time', 'prompt_size', 'original_line', 'metadata']
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for record in data:
+                # Flatten metadata for CSV
+                csv_record = {
+                    'prompt': record.get('prompt', ''),
+                    'expected': record.get('expected', ''),
+                    'outcome': record.get('outcome', ''),
+                    'response_time': record.get('response_time', ''),
+                    'prompt_size': record.get('prompt_size', ''),
+                    'original_line': record.get('original_line', ''),
+                    'metadata': json.dumps(record.get('metadata', {}))
+                }
+                writer.writerow(csv_record)
+    
+    elif format_type == 'tsv':
+        # Write as TSV
+        if not data:
+            with open(file_path, 'w') as f:
+                f.write("prompt\texpected\toutcome\tresponse_time\tprompt_size\toriginal_line\tmetadata\n")
+            return
+        
+        with open(file_path, 'w', newline='', encoding='utf-8') as f:
+            # Write header
+            f.write("prompt\texpected\toutcome\tresponse_time\tprompt_size\toriginal_line\tmetadata\n")
+            
+            for record in data:
+                # Escape tabs in data
+                def escape_tsv(value):
+                    if value is None:
+                        return ''
+                    return str(value).replace('\t', '\\t').replace('\n', '\\n').replace('\r', '\\r')
+                
+                f.write(f"{escape_tsv(record.get('prompt', ''))}\t")
+                f.write(f"{escape_tsv(record.get('expected', ''))}\t")
+                f.write(f"{escape_tsv(record.get('outcome', ''))}\t")
+                f.write(f"{escape_tsv(record.get('response_time', ''))}\t")
+                f.write(f"{escape_tsv(record.get('prompt_size', ''))}\t")
+                f.write(f"{escape_tsv(record.get('original_line', ''))}\t")
+                f.write(f"{escape_tsv(json.dumps(record.get('metadata', {})))}\n")
+    
+    elif format_type == 'parquet':
+        # Write as Parquet
+        try:
+            import pandas as pd
+            df = pd.DataFrame(data)
+            df.to_parquet(file_path, index=False)
+        except ImportError:
+            print("Warning: pandas not available for parquet export. Falling back to JSON.")
+            write_results_to_file(data, file_path.replace('.parquet', '.jsonl'), 'json')
+
 # Node to load the dataset
 class LoadDatasetNode(Node):
-    """Loads the prompt injection dataset from a CSV file."""
+    """Loads the prompt injection dataset from various file formats."""
     
     def prep(self, shared):
         input_file = shared.get("input_file", "prompt_inject_dataset.csv")
         max_lines = shared.get("max_lines", None)
-        return input_file, max_lines
+        format_hint = shared.get("format_hint", None)
+        return input_file, max_lines, format_hint
     
     def exec(self, inputs):
-        input_file, max_lines = inputs
-        dataset = []
-        line_count = 0
+        input_file, max_lines, format_hint = inputs
         
         try:
-            with open(input_file, 'r') as infile:
-                for line in infile:
-                    # Check if we've reached the maximum number of lines
-                    if max_lines is not None and line_count >= max_lines:
-                        break
-                        
-                    line = line.strip()
-                    if not line:
-                        continue
-                    
-                    # Split line by | and strip surrounding quotation marks
-                    parts = line.split('|')
-                    if len(parts) < 2:
-                        continue
-                    
-                    prompt = parts[0].strip().strip('"').strip("'")
-                    expected = parts[1].strip().strip('"').strip("'").lower() if len(parts) > 1 else "unknown"
-                    
-                    dataset.append({
-                        "prompt": prompt,
-                        "expected": expected,
-                        "original_line": line
-                    })
-                    
-                    line_count += 1
-            
+            # Use the enhanced dataset reader
+            dataset = load_dataset_enhanced(input_file, max_lines, format_hint)
             print(f"Loaded {len(dataset)} lines from {input_file}")
             return dataset
         except FileNotFoundError:
@@ -219,11 +275,23 @@ class ScanPromptsNode(BatchNode):
 
 # Node to save scan results
 class SaveResultsNode(Node):
-    """Saves the scan results to a CSV file."""
+    """Saves the scan results to a CSV file in the results folder."""
     
     def prep(self, shared):
+        input_file = shared.get("input_file", "prompt_inject_dataset.csv")
         output_file = shared.get("output_file", "scanned_output.csv")
-        return output_file, shared["scan_results"]
+        
+        # Create results directory
+        import os
+        results_dir = "results"
+        os.makedirs(results_dir, exist_ok=True)
+        
+        # Extract dataset name from input file
+        dataset_name = os.path.splitext(os.path.basename(input_file))[0]
+        
+        # Create main results filename in results folder
+        main_results_file = os.path.join(results_dir, f"{dataset_name}_results.csv")
+        return main_results_file, shared["scan_results"]
     
     def exec(self, inputs):
         output_file, scan_results = inputs
@@ -327,18 +395,39 @@ class EvaluateAccuracyNode(Node):
 
 # Node to export false positives
 class ExportFalsePositivesNode(Node):
-    """Exports prompts that were marked as false positives to a CSV file."""
+    """Exports prompts that were marked as false positives to a JSON file."""
     
     def prep(self, shared):
         scan_results = shared.get("scan_results", [])
+        input_file = shared.get("input_file", "prompt_inject_dataset.csv")
         output_file = shared.get("output_file", "scanned_output.csv")
-        # Create false positives filename based on output file
-        base_name = output_file.replace('.csv', '')
-        false_positives_file = f"{base_name}_false_positives.csv"
-        return scan_results, false_positives_file
+        output_format = shared.get("output_format", "json")
+        
+        # Create results directory
+        import os
+        results_dir = "results"
+        os.makedirs(results_dir, exist_ok=True)
+        
+        # Extract dataset name from input file
+        dataset_name = os.path.splitext(os.path.basename(input_file))[0]
+        
+        # Create false positives filename in results folder with appropriate extension
+        if output_format == 'json':
+            extension = 'jsonl'
+        elif output_format == 'csv':
+            extension = 'csv'
+        elif output_format == 'tsv':
+            extension = 'tsv'
+        elif output_format == 'parquet':
+            extension = 'parquet'
+        else:
+            extension = 'jsonl'  # Default fallback
+        
+        false_positives_file = os.path.join(results_dir, f"{dataset_name}_false_positives.{extension}")
+        return scan_results, false_positives_file, output_format
     
     def exec(self, inputs):
-        scan_results, false_positives_file = inputs
+        scan_results, false_positives_file, output_format = inputs
         
         if not scan_results:
             print("No results to export for false positives.")
@@ -351,22 +440,29 @@ class ExportFalsePositivesNode(Node):
             
             # False positive: expected 'false' but got 'flagged'
             if expected == 'false' and outcome == 'flagged':
-                false_positives.append(result)
+                # Create structured record
+                json_record = {
+                    "prompt": result['prompt'],
+                    "expected": result['expected'],
+                    "outcome": result['outcome'],
+                    "response_time": result.get('response_time'),
+                    "prompt_size": result.get('prompt_size'),
+                    "original_line": result.get('original_line', ''),
+                    "metadata": {
+                        "type": "false_positive",
+                        "export_timestamp": datetime.now().isoformat()
+                    }
+                }
+                false_positives.append(json_record)
         
         if not false_positives:
             print("No false positives found to export.")
-            # Create empty file with header
-            with open(false_positives_file, 'w') as outfile:
-                outfile.write("prompt|expected|outcome|response_time|prompt_size|original_line\n")
+            # Create empty file
+            write_results_to_file([], false_positives_file, output_format)
             return false_positives_file
         
-        # Write false positives to CSV
-        with open(false_positives_file, 'w') as outfile:
-            for result in false_positives:
-                response_time = result.get('response_time')
-                response_time_str = f"{response_time:.4f}" if response_time is not None else "N/A"
-                prompt_size = result.get('prompt_size', 'N/A')
-                outfile.write(f"{result['prompt']}|{result['expected']}|{result['outcome']}|{response_time_str}|{prompt_size}|{result.get('original_line', '')}\n")
+        # Write false positives using the specified format
+        write_results_to_file(false_positives, false_positives_file, output_format)
         
         print(f"Exported {len(false_positives)} false positives to {false_positives_file}")
         return false_positives_file
@@ -377,18 +473,39 @@ class ExportFalsePositivesNode(Node):
 
 # Node to export false negatives
 class ExportFalseNegativesNode(Node):
-    """Exports prompts that were marked as false negatives to a CSV file."""
+    """Exports prompts that were marked as false negatives to a JSON file."""
     
     def prep(self, shared):
         scan_results = shared.get("scan_results", [])
+        input_file = shared.get("input_file", "prompt_inject_dataset.csv")
         output_file = shared.get("output_file", "scanned_output.csv")
-        # Create false negatives filename based on output file
-        base_name = output_file.replace('.csv', '')
-        false_negatives_file = f"{base_name}_false_negatives.csv"
-        return scan_results, false_negatives_file
+        output_format = shared.get("output_format", "json")
+        
+        # Create results directory
+        import os
+        results_dir = "results"
+        os.makedirs(results_dir, exist_ok=True)
+        
+        # Extract dataset name from input file
+        dataset_name = os.path.splitext(os.path.basename(input_file))[0]
+        
+        # Create false negatives filename in results folder with appropriate extension
+        if output_format == 'json':
+            extension = 'jsonl'
+        elif output_format == 'csv':
+            extension = 'csv'
+        elif output_format == 'tsv':
+            extension = 'tsv'
+        elif output_format == 'parquet':
+            extension = 'parquet'
+        else:
+            extension = 'jsonl'  # Default fallback
+        
+        false_negatives_file = os.path.join(results_dir, f"{dataset_name}_false_negatives.{extension}")
+        return scan_results, false_negatives_file, output_format
     
     def exec(self, inputs):
-        scan_results, false_negatives_file = inputs
+        scan_results, false_negatives_file, output_format = inputs
         
         if not scan_results:
             print("No results to export for false negatives.")
@@ -401,22 +518,29 @@ class ExportFalseNegativesNode(Node):
             
             # False negative: expected 'true' but got 'cleared'
             if expected == 'true' and outcome == 'cleared':
-                false_negatives.append(result)
+                # Create structured record
+                json_record = {
+                    "prompt": result['prompt'],
+                    "expected": result['expected'],
+                    "outcome": result['outcome'],
+                    "response_time": result.get('response_time'),
+                    "prompt_size": result.get('prompt_size'),
+                    "original_line": result.get('original_line', ''),
+                    "metadata": {
+                        "type": "false_negative",
+                        "export_timestamp": datetime.now().isoformat()
+                    }
+                }
+                false_negatives.append(json_record)
         
         if not false_negatives:
             print("No false negatives found to export.")
-            # Create empty file with header
-            with open(false_negatives_file, 'w') as outfile:
-                outfile.write("prompt|expected|outcome|response_time|prompt_size|original_line\n")
+            # Create empty file
+            write_results_to_file([], false_negatives_file, output_format)
             return false_negatives_file
         
-        # Write false negatives to CSV
-        with open(false_negatives_file, 'w') as outfile:
-            for result in false_negatives:
-                response_time = result.get('response_time')
-                response_time_str = f"{response_time:.4f}" if response_time is not None else "N/A"
-                prompt_size = result.get('prompt_size', 'N/A')
-                outfile.write(f"{result['prompt']}|{result['expected']}|{result['outcome']}|{response_time_str}|{prompt_size}|{result.get('original_line', '')}\n")
+        # Write false negatives using the specified format
+        write_results_to_file(false_negatives, false_negatives_file, output_format)
         
         print(f"Exported {len(false_negatives)} false negatives to {false_negatives_file}")
         return false_negatives_file
@@ -560,6 +684,9 @@ def main():
                       help='Number of lines to process from the input file (optional)')
     parser.add_argument('--output', '-o', type=str, default='scanned_output.csv',
                       help='Output file name for results (default: scanned_output.csv)')
+    parser.add_argument('--format', '-f', type=str, default='json', 
+                      choices=['json', 'csv', 'tsv', 'parquet'],
+                      help='Output format for false positives/negatives (default: json)')
     
     args = parser.parse_args()
     
@@ -570,7 +697,8 @@ def main():
     shared = {
         "input_file": args.input,
         "max_lines": args.lines,
-        "output_file": args.output
+        "output_file": args.output,
+        "output_format": args.format
     }
     
     try:
