@@ -26,8 +26,7 @@ test-core:
     - echo "Running core functionality tests..."
     - python tests/test_runner_simple.py --core --verbose
   only:
-    - main
-    - develop
+    - master
     - merge_requests
 
 # Test dataset converter
@@ -42,8 +41,7 @@ test-converter:
     - echo "Running dataset converter tests..."
     - python tests/test_runner_simple.py --converter --verbose
   only:
-    - main
-    - develop
+    - master
     - merge_requests
 
 # Test enhanced reader
@@ -58,8 +56,7 @@ test-reader:
     - echo "Running enhanced reader tests..."
     - python tests/test_runner_simple.py --reader --verbose
   only:
-    - main
-    - develop
+    - master
     - merge_requests
 
 # Test integration
@@ -74,8 +71,7 @@ test-integration:
     - echo "Running integration tests..."
     - python tests/test_runner_simple.py --integration --verbose
   only:
-    - main
-    - develop
+    - master
     - merge_requests
 
 # Feature validation
@@ -89,8 +85,7 @@ test-features:
     - echo "Testing core features with CI-friendly script..."
     - python test_ci_features.py
   only:
-    - main
-    - develop
+    - master
     - merge_requests
 
 # Code quality checks
@@ -107,8 +102,7 @@ lint:
     - black --check --diff .
   allow_failure: true
   only:
-    - main
-    - develop
+    - master
     - merge_requests
 
 # Security scanning
@@ -129,6 +123,5 @@ security:
     expire_in: 1 week
   allow_failure: true
   only:
-    - main
-    - develop
+    - master
     - merge_requests
