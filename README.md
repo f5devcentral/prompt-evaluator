@@ -2,6 +2,8 @@
 
 A comprehensive tool for evaluating AI-powered scanners in detecting various types of content using CalypsoAI API.
 
+[![pipeline status](https://gitlab.com/Artemouse/prompt-evaluator/badges/master/pipeline.svg)](https://gitlab.com/Artemouse/prompt-evaluator/-/commits/master)
+
 ## 🎉 Version 2.0 Released!
 
 **Major Release**: [**v2.0.0**](RELEASE_NOTES_v2.0.md) - October 2025
