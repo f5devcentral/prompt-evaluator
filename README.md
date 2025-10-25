@@ -1,8 +1,26 @@
-# Prompt Evaluator
+# prompt-evaluator
 
-A comprehensive tool for evaluating AI-powered scanners in detecting various types of content using CalypsoAI API.
+<p align="left">
+  <!-- Build and Quality -->
+  <a href="https://gitlab.com/Artemouse/prompt-evaluator/commits/master">
+    <img src="https://gitlab.com/Artemouse/prompt-evaluator/badges/master/pipeline.svg" alt="Pipeline Status">
+  </a>
+  <a href="https://gitlab.com/Artemouse/prompt-evaluator/commits/master">
+    <img src="https://gitlab.com/Artemouse/prompt-evaluator/badges/master/coverage.svg" alt="Coverage">
+  </a>
+  <img src="https://img.shields.io/gitlab/last-commit/Artemouse/prompt-evaluator?color=6f42c1&label=Last%20Commit" alt="Last Commit">
 
-[![pipeline status](https://gitlab.com/Artemouse/prompt-evaluator/badges/master/pipeline.svg)](https://gitlab.com/Artemouse/prompt-evaluator/-/commits/master)
+  <!-- Version & License -->
+  <img src="https://img.shields.io/badge/version-2.0-blue?logo=gitlab&logoColor=white" alt="Version 2.0">
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/license-MIT-success.svg" alt="License: MIT">
+  </a>
+
+  <!-- Language & Runtime -->
+  <a href="https://www.python.org/">
+    <img src="https://img.shields.io/badge/language-Python-yellow.svg?logo=python&logoColor=white" alt="Python">
+  </a>
+</p>
 
 ## 🎉 Version 2.0 Released!
 
