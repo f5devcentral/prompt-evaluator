@@ -1,4 +1,36 @@
+<<<<<<< README.md
+<h1 align="center">prompt-evaluator</h1>
+
+<p align="center">
+  <em>Evaluate and analyze prompts for quality, risk, and compliance — built in Python.</em>
+</p>
+
+<p align="center">
+  <!-- Build and Quality -->
+  <a href="https://gitlab.com/Artemouse/prompt-evaluator/commits/master">
+    <img src="https://gitlab.com/Artemouse/prompt-evaluator/badges/master/pipeline.svg" alt="Pipeline Status">
+  </a>
+  <a href="https://gitlab.com/Artemouse/prompt-evaluator/commits/master">
+    <img src="https://gitlab.com/Artemouse/prompt-evaluator/badges/master/coverage.svg" alt="Coverage">
+  </a>
+  <img src="https://img.shields.io/gitlab/last-commit/Artemouse/prompt-evaluator?color=6f42c1&label=Last%20Commit" alt="Last Commit">
+
+  <!-- Version & License -->
+  <img src="https://img.shields.io/badge/version-2.0-blue?logo=gitlab&logoColor=white" alt="Version 2.0">
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/license-MIT-success.svg" alt="License: MIT">
+  </a>
+
+  <!-- Language & Runtime -->
+  <a href="https://www.python.org/">
+    <img src="https://img.shields.io/badge/language-Python-yellow.svg?logo=python&logoColor=white" alt="Python">
+  </a>
+</p>
+
+# Prompt Evaluator
+=======
 # prompt-evaluator
+>>>>>>> README.md
 
 <p align="left">
   <!-- Build and Quality -->
