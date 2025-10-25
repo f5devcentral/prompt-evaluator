@@ -7,7 +7,7 @@
 <p align="center">
   <!-- Build and Quality -->
   <a href="https://gitlab.com/Artemouse/prompt-evaluator/commits/master">
-    <img src="https://gitlab.com/Artemouse/prompt-evaluator/badges/master/pipeline.svg" alt="Pipeline Status">
+    <img src="https://gitlab.com/Artemouse/prompt-evaluator/badges/master/pipeline.svg?cache=none" alt="Pipeline Status">
   </a>
   <a href="https://gitlab.com/Artemouse/prompt-evaluator/commits/master">
     <img src="https://gitlab.com/Artemouse/prompt-evaluator/badges/master/coverage.svg" alt="Coverage">
