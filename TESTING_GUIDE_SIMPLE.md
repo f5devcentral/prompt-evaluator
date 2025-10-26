@@ -257,7 +257,7 @@ print(f'Read {len(records)} records in {end_time - start_time:.2f} seconds')
 
 ## 🔄 **Continuous Integration**
 
-### **GitHub Actions**
+### **GitLab CI/CD**
 The simplified CI pipeline runs:
 - Core functionality tests on multiple Python versions
 - Feature testing for all tools

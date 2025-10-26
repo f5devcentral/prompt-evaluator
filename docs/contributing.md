@@ -32,7 +32,7 @@ Contributions are welcome! Here are some guidelines for contributing to this pro
 
 1. Clone your fork:
    ```bash
-   git clone https://github.com/your-username/prompt-evaluator.git
+   git clone https://gitlab.com/your-username/prompt-evaluator.git
    cd prompt-evaluator
    ```
 

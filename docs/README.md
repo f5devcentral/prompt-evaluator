@@ -43,4 +43,4 @@ This directory contains comprehensive documentation for the Prompt Evaluator pro
 
 - Check [Troubleshooting](troubleshooting.md) for common issues
 - Review the [Contributing Guide](contributing.md) for development
-- Open an issue on GitHub for bugs or feature requests
+- Open an issue on GitLab for bugs or feature requests
