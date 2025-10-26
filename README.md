@@ -9,9 +9,6 @@
   <a href="https://gitlab.com/Artemouse/prompt-evaluator/commits/master">
     <img src="https://gitlab.com/Artemouse/prompt-evaluator/badges/master/pipeline.svg?cache=none" alt="Pipeline Status">
   </a>
-  <a href="https://gitlab.com/Artemouse/prompt-evaluator/commits/master">
-    <img src="https://gitlab.com/Artemouse/prompt-evaluator/badges/master/coverage.svg" alt="Coverage">
-  </a>
   <img src="https://img.shields.io/gitlab/last-commit/Artemouse/prompt-evaluator?color=6f42c1&label=Last%20Commit" alt="Last Commit">
 
   <!-- Version & License -->
