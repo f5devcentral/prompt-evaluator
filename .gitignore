@@ -70,12 +70,12 @@ ehthumbs.db
 Thumbs.db
 
 # Large test datasets (keep small ones)
-datasets/*.csv
-datasets/*.jsonl
-datasets/*.tsv
-datasets/*.parquet
-!datasets/sample_*.csv
-!datasets/sample_*.jsonl
+#datasets/*.csv
+#datasets/*.jsonl
+#datasets/*.tsv
+#datasets/*.parquet
+#!datasets/sample_*.csv
+#!datasets/sample_*.jsonl
 
 # Results and outputs
 results/
