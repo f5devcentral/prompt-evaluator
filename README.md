@@ -33,6 +33,12 @@ This major release introduces significant improvements to dataset handling, form
 
 ## 🆕 What's New
 
+### PDF Report Generation 🎨
+- **Professional Reports**: Beautiful, modern PDF reports with comprehensive analysis
+- **Visual Charts**: Confusion matrices, bar charts, and performance visualizations
+- **Complete Analysis**: Detailed breakdowns, examples, and recommendations
+- **Easy Sharing**: Presentation-ready format for stakeholders and documentation
+
 ### Improved Dataset Formats
 - **Multiple Format Support**: JSONL, CSV, TSV, and Parquet formats
 - **Proper Escaping**: No more issues with special characters (pipes, quotes, newlines)
@@ -41,6 +47,7 @@ This major release introduces significant improvements to dataset handling, form
 - **Backward Compatibility**: All existing scripts work unchanged
 
 ### New Tools
+- **`report_generator.py`**: Generate professional PDF reports from evaluation results
 - **`tools/improved_dataset_converter.py`**: Convert between all formats with validation
 - **`tools/enhanced_dataset_reader.py`**: Unified reader that auto-detects formats
 - **`tools/migrate_datasets.py`**: Batch migration tool for existing datasets
@@ -77,6 +84,8 @@ python prompt_evaluator.py --input datasets/my_dataset.jsonl
    python prompt_evaluator.py --input datasets/prompt_inject_dataset.csv
    ```
 
+4. **PDF report is automatically generated!** Check `results/` directory
+
 ## Features
 
 - **Flexible Evaluation**: Works with any CSV dataset
@@ -97,25 +106,29 @@ python prompt_evaluator.py --input datasets/my_dataset.jsonl
 - **[Usage Guide](docs/usage.md)** - Complete usage examples and options
 - **[Dataset Management](docs/datasets.md)** - Working with datasets and Hugging Face
 - **[🆕 Improved Dataset Formats](docs/IMPROVED_DATASET_FORMATS.md)** - New dataset formats and migration guide
+- **[🆕 PDF Reports](docs/pdf-reports.md)** - Generate professional PDF reports
 - **[🆕 Dataset Tools](tools/README.md)** - New dataset tools and utilities
+- **[Evaluation Metrics](docs/evaluation-metrics.md)** - Understanding performance metrics
 - **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 - **[Contributing](docs/contributing.md)** - How to contribute to the project
 
-## Available Evaluators
+## Available Tools
 
-| Evaluator | Description | Use Case |
-|-----------|-------------|----------|
+| Tool | Description | Use Case |
+|------|-------------|----------|
 | `prompt_evaluator.py` | Standard CalypsoAI evaluation | General purpose evaluation |
 | `prompt_evaluator_prompts.py` | Advanced CalypsoAI with LLM responses | Detailed analysis with full responses |
 | `evaluate_existing_results.py` | Calculate metrics from existing results | Re-analyze without re-scanning |
+| **`report_generator.py`** | **Generate professional PDF reports** | **Create presentation-ready reports** |
 
 ## Sample Datasets
 
-The project includes several sample datasets in the `datasets/` folder:
-- `promptinject-codesagar_malicious_llm_prompts_v4_test.csv` - Prompt injection examples
-- `pii_dataset.csv` - Personally identifiable information examples
-- `fin_advice_dataset.csv` - Financial advice prompts
-- `eu-ai-act-prompts.csv` - EU AI Act compliance prompts
+The project includes several sample datasets in the `datasets/sample-datasets/` folder:
+- `codesagar_malicious_llm_prompts_v4_test.jsonl` - Prompt injection examples
+- `pii_dataset.jsonl` - Personally identifiable information examples
+- `fin_advice_dataset.jsonl` - Financial advice prompts
+- `eu-ai-act-prompts.jsonl` - EU AI Act compliance prompts
+- `xTRam1_safe_guard_prompt_injection_test.jsonl` - Additional prompt injection test cases
 
 
 ## License
