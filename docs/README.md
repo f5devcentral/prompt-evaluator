@@ -7,11 +7,14 @@ This directory contains comprehensive documentation for the Prompt Evaluator pro
 - **[Installation Guide](installation.md)** - Detailed setup instructions and requirements
 - **[Usage Guide](usage.md)** - Complete usage examples and command-line options
 - **[Dataset Management](datasets.md)** - Working with datasets and Hugging Face integration
+- **[Evaluation Metrics](evaluation-metrics.md)** - Understanding performance metrics
+- **[PDF Reports](pdf-reports.md)** - Generate professional PDF reports
 - **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
 - **[Contributing](contributing.md)** - How to contribute to the project
 
 ## 🆕 New Features
 
+- **[PDF Report Generator](pdf-reports.md)** - Beautiful, professional PDF reports with charts and analysis
 - **[Improved Dataset Formats](IMPROVED_DATASET_FORMATS.md)** - New dataset formats and migration guide
 
 ## Quick Reference
@@ -28,6 +31,7 @@ This directory contains comprehensive documentation for the Prompt Evaluator pro
 - `demo_improved_formats.py` - Complete demonstration
 
 ### Utility Tools
+- `report_generator.py` - Generate professional PDF reports
 - `download_hf_datasets.py` - Download datasets from Hugging Face
 - `convert_dataset.py` - Legacy dataset converter
 - `validate_setup.py` - Validate your setup

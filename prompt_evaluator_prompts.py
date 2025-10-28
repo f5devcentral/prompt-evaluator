@@ -764,6 +764,110 @@ Slowest Response ({max_time:.4f}s):
         print(exec_res)
         return "default"
 
+# Node to generate PDF report
+class GeneratePDFReportNode(Node):
+    """Generates a PDF report from evaluation results."""
+    
+    def prep(self, shared):
+        # Check if PDF generation dependencies are available
+        try:
+            import reportlab
+        except ImportError:
+            return None, None
+        
+        evaluation_results = shared.get("evaluation_results", {})
+        prompt_results = shared.get("prompt_results", [])
+        input_file = shared.get("input_file", "prompt_inject_dataset.csv")
+        
+        # Extract dataset name from input file
+        dataset_name = os.path.splitext(os.path.basename(input_file))[0]
+        
+        return evaluation_results, dataset_name, prompt_results
+    
+    def exec(self, inputs):
+        evaluation_results, dataset_name, prompt_results = inputs
+        
+        # Skip if dependencies not available
+        if evaluation_results is None:
+            return None
+        
+        try:
+            from report_generator import PDFReportGenerator
+            
+            # Prepare metrics
+            metrics = {
+                'true_positive': evaluation_results.get('true_positive', 0),
+                'true_negative': evaluation_results.get('true_negative', 0),
+                'false_positive': evaluation_results.get('false_positive', 0),
+                'false_negative': evaluation_results.get('false_negative', 0),
+                'total': evaluation_results.get('total', 0),
+                'accuracy': evaluation_results.get('accuracy', 0),
+                'precision': evaluation_results.get('precision', 0),
+                'recall': evaluation_results.get('recall', 0),
+                'f1_score': evaluation_results.get('f1_score', 0)
+            }
+            
+            # Extract false positives and false negatives from prompt results
+            false_positives = []
+            false_negatives = []
+            
+            for result in prompt_results:
+                expected = result.get("expected", "").lower()
+                actual = result.get("outcome", "").lower()
+                
+                # Normalize expected values
+                if expected in ['true', 'injection', 'malicious', 'attack']:
+                    expected_normalized = 'true'
+                elif expected in ['false', 'benign', 'safe', 'normal']:
+                    expected_normalized = 'false'
+                else:
+                    expected_normalized = expected
+                
+                # Normalize actual values
+                if actual in ['flagged', 'blocked']:
+                    actual_normalized = 'flagged'
+                elif actual == 'cleared':
+                    actual_normalized = 'cleared'
+                else:
+                    actual_normalized = actual
+                
+                if expected_normalized == 'false' and actual_normalized == 'flagged':
+                    false_positives.append(result)
+                elif expected_normalized == 'true' and actual_normalized == 'cleared':
+                    false_negatives.append(result)
+            
+            # Calculate latency statistics
+            response_times = [r.get('response_time') for r in prompt_results if r.get('response_time') is not None]
+            latency_stats = None
+            
+            if response_times:
+                latency_stats = {
+                    'average_latency': sum(response_times) / len(response_times),
+                    'min_latency': min(response_times),
+                    'max_latency': max(response_times)
+                }
+            
+            # Generate report
+            generator = PDFReportGenerator()
+            output_path = generator.generate_report(
+                dataset_name=dataset_name,
+                metrics=metrics,
+                false_positives=false_positives if false_positives else None,
+                false_negatives=false_negatives if false_negatives else None,
+                latency_stats=latency_stats
+            )
+            
+            return output_path
+        except Exception as e:
+            print(f"Warning: Could not generate PDF report: {str(e)}")
+            return None
+    
+    def post(self, shared, prep_res, exec_res):
+        if exec_res:
+            shared["pdf_report_path"] = exec_res
+            print(f"\nPDF Report: {exec_res}")
+        return "default"
+
 def create_evaluation_flow():
     """Creates the evaluation workflow."""
     # Create nodes
@@ -775,9 +879,10 @@ def create_evaluation_flow():
     export_false_negatives = ExportFalseNegativesNode()
     display_results = DisplayResultsNode()
     latency_stats = LatencyStatsNode()
+    generate_pdf_report = GeneratePDFReportNode()
     
     # Connect nodes in sequence
-    load_dataset >> send_prompts >> save_results >> evaluate_accuracy >> export_false_positives >> export_false_negatives >> display_results >> latency_stats
+    load_dataset >> send_prompts >> save_results >> evaluate_accuracy >> export_false_positives >> export_false_negatives >> display_results >> latency_stats >> generate_pdf_report
     
     # Create flow with the starting node
     return Flow(start=load_dataset)
