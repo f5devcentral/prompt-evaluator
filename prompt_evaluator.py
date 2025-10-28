@@ -275,11 +275,12 @@ class ScanPromptsNode(BatchNode):
 
 # Node to save scan results
 class SaveResultsNode(Node):
-    """Saves the scan results to a CSV file in the results folder."""
+    """Saves the scan results to a file in the results folder."""
     
     def prep(self, shared):
         input_file = shared.get("input_file", "prompt_inject_dataset.csv")
         output_file = shared.get("output_file", "scanned_output.csv")
+        results_format = shared.get("results_format", "json")  # Default to JSONL
         
         # Create results directory
         import os
@@ -289,26 +290,33 @@ class SaveResultsNode(Node):
         # Extract dataset name from input file
         dataset_name = os.path.splitext(os.path.basename(input_file))[0]
         
+        # Determine file extension based on format
+        if results_format == 'json':
+            extension = 'jsonl'
+        elif results_format == 'csv':
+            extension = 'csv'
+        elif results_format == 'tsv':
+            extension = 'tsv'
+        elif results_format == 'parquet':
+            extension = 'parquet'
+        else:
+            extension = 'jsonl'  # Default fallback
+        
         # Create main results filename in results folder
-        main_results_file = os.path.join(results_dir, f"{dataset_name}_results.csv")
-        return main_results_file, shared["scan_results"]
+        main_results_file = os.path.join(results_dir, f"{dataset_name}_results.{extension}")
+        return main_results_file, shared["scan_results"], results_format
     
     def exec(self, inputs):
-        output_file, scan_results = inputs
+        output_file, scan_results, results_format = inputs
         
         if not scan_results:
             print(f"No results to save to {output_file}.")
-            # Create an empty file with a header
-            with open(output_file, 'w') as outfile:
-                outfile.write("prompt|expected|outcome|response_time|prompt_size\n")
+            # Create an empty file with proper headers
+            write_results_to_file([], output_file, results_format)
             return output_file
         
-        with open(output_file, 'w') as outfile:
-            for result in scan_results:
-                response_time = result.get('response_time')
-                response_time_str = f"{response_time:.4f}" if response_time is not None else "N/A"
-                prompt_size = result.get('prompt_size', 'N/A')
-                outfile.write(f"{result['original_line']}|{result['outcome']}|{response_time_str}|{prompt_size}\n")
+        # Use the write_results_to_file function with the specified format
+        write_results_to_file(scan_results, output_file, results_format)
         
         return output_file
     
@@ -776,6 +784,9 @@ def main():
     parser.add_argument('--format', '-f', type=str, default='json', 
                       choices=['json', 'csv', 'tsv', 'parquet'],
                       help='Output format for false positives/negatives (default: json)')
+    parser.add_argument('--results-format', '-r', type=str, default='json',
+                      choices=['json', 'csv', 'tsv', 'parquet'],
+                      help='Output format for main results file (default: json/jsonl)')
     
     args = parser.parse_args()
     
@@ -787,7 +798,8 @@ def main():
         "input_file": args.input,
         "max_lines": args.lines,
         "output_file": args.output,
-        "output_format": args.format
+        "output_format": args.format,
+        "results_format": args.results_format
     }
     
     try:
@@ -799,7 +811,7 @@ def main():
             print("\nNo data was processed. Exiting.")
             return
         
-        print(f"\nResults have been saved to: {args.output}")
+        print(f"\nResults have been saved to: {shared.get('output_file', args.output)}")
     except Exception as e:
         print(f"\nAn error occurred: {str(e)}")
         return

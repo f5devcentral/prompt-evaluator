@@ -86,6 +86,12 @@ python prompt_evaluator.py --input datasets/my_dataset.jsonl
 
 4. **PDF report is automatically generated!** Check `results/` directory
 
+5. **Generate reports manually (optional):**
+   ```bash
+   # Use just the dataset name (not the full path)
+   python report_generator.py --dataset pii_dataset
+   ```
+
 ## Features
 
 - **Flexible Evaluation**: Works with any CSV dataset
