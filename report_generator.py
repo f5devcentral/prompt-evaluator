@@ -487,67 +487,94 @@ def load_evaluation_results(dataset_name, results_dir="results"):
         with open(fn_file, 'r') as f:
             results['false_negatives'] = [json.loads(line) for line in f if line.strip()]
     
-    # Try to load from CSV files
+    # Try to load results file - check for JSONL first, then CSV
+    jsonl_file = os.path.join(results_dir, f"{dataset_name}_results.jsonl")
     csv_file = os.path.join(results_dir, f"{dataset_name}_results.csv")
-    if os.path.exists(csv_file):
+    tsv_file = os.path.join(results_dir, f"{dataset_name}_results.tsv")
+    parquet_file = os.path.join(results_dir, f"{dataset_name}_results.parquet")
+    
+    data = None
+    
+    # Try JSONL format first (new default)
+    if os.path.exists(jsonl_file):
+        with open(jsonl_file, 'r', encoding='utf-8') as f:
+            data = [json.loads(line) for line in f if line.strip()]
+    
+    # Fall back to CSV format
+    elif os.path.exists(csv_file):
         with open(csv_file, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             data = list(reader)
+    
+    # Fall back to TSV format
+    elif os.path.exists(tsv_file):
+        with open(tsv_file, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f, delimiter='\t')
+            data = list(reader)
+    
+    # Fall back to Parquet format
+    elif os.path.exists(parquet_file):
+        try:
+            import pandas as pd
+            df = pd.read_parquet(parquet_file)
+            data = df.to_dict('records')
+        except ImportError:
+            print("Warning: pandas not available to read parquet file.")
+    
+    if data:
+        # Calculate metrics
+        metrics = {
+            'true_positive': 0,
+            'true_negative': 0,
+            'false_positive': 0,
+            'false_negative': 0,
+            'total': len(data)
+        }
+        
+        response_times = []
+        
+        for row in data:
+            expected = str(row.get('expected', '')).lower()
+            outcome = str(row.get('outcome', '')).lower()
             
-            if data:
-                # Calculate metrics
-                metrics = {
-                    'true_positive': 0,
-                    'true_negative': 0,
-                    'false_positive': 0,
-                    'false_negative': 0,
-                    'total': len(data)
-                }
-                
-                response_times = []
-                
-                for row in data:
-                    expected = row.get('expected', '').lower()
-                    outcome = row.get('outcome', '').lower()
-                    
-                    if expected == 'true' and outcome == 'flagged':
-                        metrics['true_positive'] += 1
-                    elif expected == 'false' and outcome == 'cleared':
-                        metrics['true_negative'] += 1
-                    elif expected == 'false' and outcome == 'flagged':
-                        metrics['false_positive'] += 1
-                    elif expected == 'true' and outcome == 'cleared':
-                        metrics['false_negative'] += 1
-                    
-                    # Collect response times
-                    if 'response_time' in row and row['response_time']:
-                        try:
-                            response_times.append(float(row['response_time']))
-                        except (ValueError, TypeError):
-                            pass
-                
-                # Calculate derived metrics
-                total = metrics['total']
-                if total > 0:
-                    metrics['accuracy'] = (metrics['true_positive'] + metrics['true_negative']) / total
-                    precision_denom = metrics['true_positive'] + metrics['false_positive']
-                    metrics['precision'] = metrics['true_positive'] / precision_denom if precision_denom > 0 else 0
-                    recall_denom = metrics['true_positive'] + metrics['false_negative']
-                    metrics['recall'] = metrics['true_positive'] / recall_denom if recall_denom > 0 else 0
-                    f1_denom = metrics['precision'] + metrics['recall']
-                    metrics['f1_score'] = 2 * metrics['precision'] * metrics['recall'] / f1_denom if f1_denom > 0 else 0
-                else:
-                    metrics['accuracy'] = metrics['precision'] = metrics['recall'] = metrics['f1_score'] = 0
-                
-                results['metrics'] = metrics
-                
-                # Calculate latency stats
-                if response_times:
-                    results['latency_stats'] = {
-                        'average_latency': np.mean(response_times),
-                        'min_latency': np.min(response_times),
-                        'max_latency': np.max(response_times)
-                    }
+            if expected == 'true' and outcome == 'flagged':
+                metrics['true_positive'] += 1
+            elif expected == 'false' and outcome == 'cleared':
+                metrics['true_negative'] += 1
+            elif expected == 'false' and outcome == 'flagged':
+                metrics['false_positive'] += 1
+            elif expected == 'true' and outcome == 'cleared':
+                metrics['false_negative'] += 1
+            
+            # Collect response times
+            if 'response_time' in row and row['response_time']:
+                try:
+                    response_times.append(float(row['response_time']))
+                except (ValueError, TypeError):
+                    pass
+        
+        # Calculate derived metrics
+        total = metrics['total']
+        if total > 0:
+            metrics['accuracy'] = (metrics['true_positive'] + metrics['true_negative']) / total
+            precision_denom = metrics['true_positive'] + metrics['false_positive']
+            metrics['precision'] = metrics['true_positive'] / precision_denom if precision_denom > 0 else 0
+            recall_denom = metrics['true_positive'] + metrics['false_negative']
+            metrics['recall'] = metrics['true_positive'] / recall_denom if recall_denom > 0 else 0
+            f1_denom = metrics['precision'] + metrics['recall']
+            metrics['f1_score'] = 2 * metrics['precision'] * metrics['recall'] / f1_denom if f1_denom > 0 else 0
+        else:
+            metrics['accuracy'] = metrics['precision'] = metrics['recall'] = metrics['f1_score'] = 0
+        
+        results['metrics'] = metrics
+        
+        # Calculate latency stats
+        if response_times:
+            results['latency_stats'] = {
+                'average_latency': np.mean(response_times),
+                'min_latency': np.min(response_times),
+                'max_latency': np.max(response_times)
+            }
     
     return results
 
@@ -581,8 +608,18 @@ def main():
             files = os.listdir(args.results_dir)
             datasets = set()
             for f in files:
-                if f.endswith('_results.csv'):
+                # Check for results files in any supported format
+                if f.endswith('_results.jsonl'):
+                    dataset_name = f.replace('_results.jsonl', '')
+                    datasets.add(dataset_name)
+                elif f.endswith('_results.csv'):
                     dataset_name = f.replace('_results.csv', '')
+                    datasets.add(dataset_name)
+                elif f.endswith('_results.tsv'):
+                    dataset_name = f.replace('_results.tsv', '')
+                    datasets.add(dataset_name)
+                elif f.endswith('_results.parquet'):
+                    dataset_name = f.replace('_results.parquet', '')
                     datasets.add(dataset_name)
             
             if len(datasets) == 1:

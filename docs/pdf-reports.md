@@ -50,6 +50,41 @@ The PDF report will be saved alongside your results in the `results/` directory.
 You can also generate reports manually for existing results:
 
 ```bash
+# Use the dataset NAME only (not the full file path)
+python report_generator.py --dataset pii_dataset
+```
+
+**Important:** The `--dataset` parameter expects only the **dataset name**, not the full file path or extension. The script automatically:
+- Looks in the `results/` directory (default)
+- Appends `_results.{format}` to find your results file
+- Searches for `.jsonl`, `.csv`, `.tsv`, or `.parquet` formats
+
+### Common Usage Examples
+
+```bash
+# If your results file is: results/pii_dataset_results.jsonl
+python report_generator.py --dataset pii_dataset
+
+# If your results file is: results/codesagar_malicious_llm_prompts_v4_test_results.jsonl
+python report_generator.py --dataset codesagar_malicious_llm_prompts_v4_test
+
+# If your results file is: results/fin_advice_dataset_results.csv
+python report_generator.py --dataset fin_advice_dataset
+```
+
+### ❌ Common Mistakes
+
+```bash
+# WRONG - Do not include the path
+python report_generator.py --dataset results/pii_dataset_results.jsonl
+
+# WRONG - Do not include the extension
+python report_generator.py --dataset pii_dataset_results.jsonl
+
+# WRONG - Do not include "_results"
+python report_generator.py --dataset pii_dataset_results
+
+# ✅ CORRECT - Just the dataset name
 python report_generator.py --dataset pii_dataset
 ```
 

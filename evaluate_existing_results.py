@@ -4,27 +4,77 @@ Evaluate existing scan results without re-scanning
 """
 
 import csv
+import json
 import argparse
+import os
 
-def evaluate_existing_results(csv_file):
-    """Evaluate accuracy from existing CSV results."""
+def evaluate_existing_results(results_file):
+    """Evaluate accuracy from existing results file (supports JSONL, CSV, TSV, Parquet)."""
     
-    # Read the scanned results
+    # Detect file format
+    file_ext = os.path.splitext(results_file)[1].lower()
+    
     scan_results = []
-    with open(csv_file, 'r') as f:
-        for line in f:
-            parts = line.strip().split('|')
-            if len(parts) >= 3:
-                prompt = parts[0]
-                expected = parts[1].strip('"').lower()
-                outcome = parts[2].strip().lower()
+    
+    # Read based on file format
+    if file_ext == '.jsonl' or file_ext == '.json':
+        # Read JSONL format
+        with open(results_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        record = json.loads(line)
+                        scan_results.append({
+                            'prompt': record.get('prompt', ''),
+                            'expected': str(record.get('expected', '')).lower(),
+                            'outcome': str(record.get('outcome', '')).lower()
+                        })
+                    except json.JSONDecodeError:
+                        continue
+    
+    elif file_ext == '.csv':
+        # Read CSV format
+        with open(results_file, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
                 scan_results.append({
-                    'prompt': prompt,
-                    'expected': expected,
-                    'outcome': outcome
+                    'prompt': row.get('prompt', ''),
+                    'expected': str(row.get('expected', '')).lower(),
+                    'outcome': str(row.get('outcome', '')).lower()
                 })
     
-    print(f"Loaded {len(scan_results)} results from {csv_file}")
+    elif file_ext == '.tsv':
+        # Read TSV format
+        with open(results_file, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f, delimiter='\t')
+            for row in reader:
+                scan_results.append({
+                    'prompt': row.get('prompt', ''),
+                    'expected': str(row.get('expected', '')).lower(),
+                    'outcome': str(row.get('outcome', '')).lower()
+                })
+    
+    elif file_ext == '.parquet':
+        # Read Parquet format
+        try:
+            import pandas as pd
+            df = pd.read_parquet(results_file)
+            for _, row in df.iterrows():
+                scan_results.append({
+                    'prompt': str(row.get('prompt', '')),
+                    'expected': str(row.get('expected', '')).lower(),
+                    'outcome': str(row.get('outcome', '')).lower()
+                })
+        except ImportError:
+            print("Error: pandas is required to read parquet files. Install with: pip install pandas pyarrow")
+            return
+    
+    else:
+        print(f"Unsupported file format: {file_ext}")
+        print("Supported formats: .jsonl, .csv, .tsv, .parquet")
+        return
+    
+    print(f"Loaded {len(scan_results)} results from {results_file}")
     
     if not scan_results:
         print("No results to evaluate.")
@@ -81,7 +131,7 @@ F1 Score: {f1_score:.2%}
 def main():
     parser = argparse.ArgumentParser(description='Evaluate existing scan results')
     parser.add_argument('--input', '-i', type=str, required=True,
-                      help='Input CSV file containing scan results to evaluate')
+                      help='Input file containing scan results (supports .jsonl, .csv, .tsv, .parquet)')
     
     args = parser.parse_args()
     evaluate_existing_results(args.input)
