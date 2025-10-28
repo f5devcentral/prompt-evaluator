@@ -25,11 +25,11 @@
 
 ## 🎉 Version 2.0 Released!
 
-**Major Release**: [**v2.0.0**](RELEASE_NOTES_v2.0.md) - October 2025
+**Major Release**: [**v2.0.0**](docs/RELEASE_NOTES_v2.0.md) - October 2025
 
 This major release introduces significant improvements to dataset handling, format support, and tooling. Key highlights include multiple dataset formats (JSONL, CSV, TSV, Parquet), enhanced migration tools, improved Hugging Face integration, and comprehensive documentation updates.
 
-**[📋 View Complete Release Notes](RELEASE_NOTES_v2.0.md)** - Detailed changelog, migration guide, and new features
+**[📋 View Complete Release Notes](docs/RELEASE_NOTES_v2.0.md)** - Detailed changelog, migration guide, and new features
 
 ## 🆕 What's New
 
@@ -101,7 +101,7 @@ python prompt_evaluator.py --input datasets/my_dataset.jsonl
 
 ## Documentation
 
-- **[📋 Release Notes v2.0](RELEASE_NOTES_v2.0.md)** - Complete changelog and migration guide
+- **[📋 Release Notes v2.0](docs/RELEASE_NOTES_v2.0.md)** - Complete changelog and migration guide
 - **[Installation Guide](docs/installation.md)** - Detailed setup instructions
 - **[Usage Guide](docs/usage.md)** - Complete usage examples and options
 - **[Dataset Management](docs/datasets.md)** - Working with datasets and Hugging Face
