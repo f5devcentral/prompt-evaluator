@@ -113,6 +113,7 @@ python prompt_evaluator.py --input datasets/my_dataset.jsonl
 - **[Dataset Management](docs/datasets.md)** - Working with datasets and Hugging Face
 - **[🆕 Improved Dataset Formats](docs/IMPROVED_DATASET_FORMATS.md)** - New dataset formats and migration guide
 - **[🆕 PDF Reports](docs/pdf-reports.md)** - Generate professional PDF reports
+- **[⚠️ Concurrent Evaluation](docs/CONCURRENT_EVALUATION.md)** - Load testing and performance benchmarking (safety guidelines included)
 - **[🆕 Dataset Tools](tools/README.md)** - New dataset tools and utilities
 - **[Evaluation Metrics](docs/evaluation-metrics.md)** - Understanding performance metrics
 - **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
@@ -120,12 +121,15 @@ python prompt_evaluator.py --input datasets/my_dataset.jsonl
 
 ## Available Tools
 
-| Tool | Description | Use Case |
-|------|-------------|----------|
-| `prompt_evaluator.py` | Standard CalypsoAI evaluation | General purpose evaluation |
-| `prompt_evaluator_prompts.py` | Advanced CalypsoAI with LLM responses | Detailed analysis with full responses |
-| `evaluate_existing_results.py` | Calculate metrics from existing results | Re-analyze without re-scanning |
-| **`report_generator.py`** | **Generate professional PDF reports** | **Create presentation-ready reports** |
+|| Tool | Description | Use Case |
+||------|-------------|----------|
+|| `prompt_evaluator.py` | Standard CalypsoAI evaluation | General purpose evaluation |
+|| `prompt_evaluator_prompts.py` | Advanced CalypsoAI with LLM responses | Detailed analysis with full responses |
+|| **`prompt_evaluator_concurrent.py`** | **⚠️ Concurrent load testing** | **Performance and scalability testing** |
+|| `evaluate_existing_results.py` | Calculate metrics from existing results | Re-analyze without re-scanning |
+|| **`report_generator.py`** | **Generate professional PDF reports** | **Create presentation-ready reports** |
+
+> **Important**: The concurrent evaluator can trigger infrastructure auto-scaling. See [Concurrent Evaluation Documentation](docs/CONCURRENT_EVALUATION.md#-important-infrastructure-impact-warning) for safety guidelines before use.
 
 ## Sample Datasets
 

@@ -1,6 +1,6 @@
 # Makefile for Prompt Evaluator - Simplified Core Testing
 
-.PHONY: help install install-test test test-core test-simple test-converter test-reader test-integration lint format type-check security clean setup-dev
+.PHONY: help install install-test test test-core test-simple test-converter test-reader test-integration lint format type-check security clean setup-dev run-concurrent test-concurrent
 
 # Default target
 help:
@@ -18,6 +18,10 @@ help:
 	@echo "  test-converter   Run dataset converter tests only"
 	@echo "  test-reader      Run enhanced reader tests only"
 	@echo "  test-integration Run integration tests only"
+	@echo "  test-concurrent  Test concurrent evaluator with small dataset"
+	@echo ""
+	@echo "Concurrent Evaluation:"
+	@echo "  run-concurrent   Run concurrent evaluation (requires dataset path)"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint             Run linting checks"
@@ -137,6 +141,32 @@ release-check: clean install-test lint format type-check test-core security
 # Quick test for development
 quick-test:
 	python tests/test_runner_simple.py --core
+
+# Concurrent Evaluation
+run-concurrent:
+	@echo "Running concurrent evaluator..."
+	@if [ -z "$(DATASET)" ]; then \
+		echo "Usage: make run-concurrent DATASET=datasets/your_dataset.csv [CONCURRENCY=10] [LINES=50]"; \
+		exit 1; \
+	fi
+	@CONCURRENCY=$${CONCURRENCY:-10}; \
+	LINES=$${LINES:-}; \
+	if [ -n "$$LINES" ]; then \
+		python prompt_evaluator_concurrent.py -i "$(DATASET)" -c $$CONCURRENCY -l $$LINES; \
+	else \
+		python prompt_evaluator_concurrent.py -i "$(DATASET)" -c $$CONCURRENCY; \
+	fi
+
+test-concurrent:
+	@echo "Testing concurrent evaluator with small dataset..."
+	@if [ -f datasets/prompt_inject_dataset.csv ]; then \
+		python prompt_evaluator_concurrent.py -i datasets/prompt_inject_dataset.csv -l 20 -c 5; \
+	elif [ -f datasets/pii_dataset.csv ]; then \
+		python prompt_evaluator_concurrent.py -i datasets/pii_dataset.csv -l 20 -c 5; \
+	else \
+		echo "No test dataset found. Please provide a dataset in the datasets/ directory."; \
+		exit 1; \
+	fi
 
 # Documentation testing
 test-docs:
