@@ -81,3 +81,6 @@ Thumbs.db
 results/
 output/
 *.log
+
+# Internal documentation (not for public repo)
+WARP.md
