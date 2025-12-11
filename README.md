@@ -121,13 +121,13 @@ python prompt_evaluator.py --input datasets/my_dataset.jsonl
 
 ## Available Tools
 
-|| Tool | Description | Use Case |
-||------|-------------|----------|
-|| `prompt_evaluator.py` | Standard CalypsoAI evaluation | General purpose evaluation |
-|| `prompt_evaluator_prompts.py` | Advanced CalypsoAI with LLM responses | Detailed analysis with full responses |
-|| **`prompt_evaluator_concurrent.py`** | **⚠️ Concurrent load testing** | **Performance and scalability testing** |
-|| `evaluate_existing_results.py` | Calculate metrics from existing results | Re-analyze without re-scanning |
-|| **`report_generator.py`** | **Generate professional PDF reports** | **Create presentation-ready reports** |
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `prompt_evaluator.py` | Standard CalypsoAI evaluation | General purpose evaluation |
+| `prompt_evaluator_prompts.py` | Advanced CalypsoAI with LLM responses | Detailed analysis with full responses |
+| **`prompt_evaluator_concurrent.py`** | **⚠️ Concurrent load testing** | **Performance and scalability testing** |
+| `evaluate_existing_results.py` | Calculate metrics from existing results | Re-analyze without re-scanning |
+| **`report_generator.py`** | **Generate professional PDF reports** | **Create presentation-ready reports** |
 
 > **Important**: The concurrent evaluator can trigger infrastructure auto-scaling. See [Concurrent Evaluation Documentation](docs/CONCURRENT_EVALUATION.md#-important-infrastructure-impact-warning) for safety guidelines before use.
 
