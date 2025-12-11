@@ -704,6 +704,51 @@ Examples:
     
     args = parser.parse_args()
     
+    # Display infrastructure impact warning
+    print("\n" + "="*80)
+    print("⚠️  INFRASTRUCTURE IMPACT WARNING")
+    print("="*80)
+    print("\nRunning concurrent evaluation can trigger infrastructure auto-scaling and")
+    print("may impact shared resources.\n")
+    print("Before proceeding, please confirm you have:")
+    print("\n  1. ✓ Checked with your platform/infrastructure team")
+    print("     - Understood auto-scaling policies")
+    print("     - Determined safe concurrency levels for your environment")
+    print("     - Scheduled during maintenance windows if necessary")
+    print("     - Obtained approval for load testing")
+    print("\n  2. ✓ Started conservatively")
+    print(f"     - Current concurrency: {args.concurrency} workers")
+    if args.concurrency > 10:
+        print("       ⚠️  WARNING: Consider starting with --concurrency 5 or lower")
+    if args.lines:
+        print(f"     - Limited to {args.lines} prompts")
+    else:
+        print("       ⚠️  WARNING: Processing entire dataset - consider using --lines to limit")
+    if args.rate_limit:
+        print(f"     - Rate limiting: {args.rate_limit} requests/sec")
+    else:
+        print("       ⚠️  WARNING: No rate limiting - consider using --rate-limit")
+    print("\n  3. ✓ Avoided peak hours for high concurrency testing")
+    print("\nNot following these guidelines could cause:")
+    print("  • Unexpected cloud infrastructure costs")
+    print("  • Service disruptions to other teams or applications")
+    print("  • Cascading failures if auto-scaling can't keep up")
+    print("\n" + "="*80)
+    
+    # Prompt user to continue
+    try:
+        response = input("\nDo you want to proceed? (yes/no): ").strip().lower()
+        if response not in ['yes', 'y']:
+            print("\nExecution cancelled by user.")
+            return
+    except (KeyboardInterrupt, EOFError):
+        print("\n\nExecution cancelled by user.")
+        return
+    
+    print("\n" + "="*80)
+    print("Starting concurrent evaluation...")
+    print("="*80 + "\n")
+    
     # Create and run the concurrent evaluation flow
     flow = create_concurrent_evaluation_flow(
         concurrency=args.concurrency,
