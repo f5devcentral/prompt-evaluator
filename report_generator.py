@@ -284,6 +284,47 @@ class PDFReportGenerator:
         
         return table
     
+    def _generate_latency_chart(self, latency_stats):
+        """Generate a chart showing latency distribution."""
+        fig, ax = plt.subplots(figsize=(7, 5))
+        
+        # Prepare data (convert to milliseconds for better readability)
+        metrics = ['Avg', 'Min', 'Max', 'p50', 'p95', 'p99']
+        values = [
+            latency_stats.get('average_latency', 0) * 1000,
+            latency_stats.get('min_latency', 0) * 1000,
+            latency_stats.get('max_latency', 0) * 1000,
+            latency_stats.get('p50_latency', 0) * 1000,
+            latency_stats.get('p95_latency', 0) * 1000,
+            latency_stats.get('p99_latency', 0) * 1000
+        ]
+        
+        # Create bar chart with different colors for different metric types
+        colors_list = ['#3498DB', '#95A5A6', '#95A5A6', '#2ECC71', '#F39C12', '#E74C3C']
+        bars = ax.bar(metrics, values, color=colors_list)
+        
+        # Add value labels on bars
+        for bar, value in zip(bars, values):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height,
+                   f'{value:.1f}ms',
+                   ha='center', va='bottom', fontsize=9, fontweight='bold')
+        
+        # Customize chart
+        ax.set_ylabel('Latency (milliseconds)', fontsize=11, fontweight='bold')
+        ax.set_title('Request Latency Distribution', fontsize=13, fontweight='bold')
+        ax.grid(axis='y', alpha=0.3, linestyle='--')
+        
+        plt.tight_layout()
+        
+        # Save to BytesIO
+        img_buffer = BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+        plt.close()
+        img_buffer.seek(0)
+        
+        return img_buffer
+    
     def generate_report(self, dataset_name, metrics, false_positives=None, false_negatives=None, 
                        latency_stats=None, output_path=None):
         """
@@ -410,19 +451,58 @@ class PDFReportGenerator:
         ))
         story.append(PageBreak())
         
-        # Latency Statistics
+        # Performance Statistics
         if latency_stats:
             story.append(Paragraph("Performance Statistics", self.styles['SectionHeader']))
             story.append(Spacer(1, 0.2*inch))
             
-            if 'average_latency' in latency_stats:
+            # Throughput section
+            if 'throughput' in latency_stats:
+                story.append(Paragraph("Throughput", self.styles['SubsectionHeader']))
                 story.append(Paragraph(
-                    f"<b>Average Response Time:</b> {latency_stats['average_latency']:.3f}s<br/>"
-                    f"<b>Min Response Time:</b> {latency_stats['min_latency']:.3f}s<br/>"
-                    f"<b>Max Response Time:</b> {latency_stats['max_latency']:.3f}s",
+                    f"<b>Overall Throughput:</b> {latency_stats['throughput']:.2f} prompts/sec<br/>"
+                    f"<b>Total Prompts Processed:</b> {latency_stats.get('total_prompts', 0)}<br/>"
+                    f"<b>Total Elapsed Time:</b> {latency_stats.get('total_time', 0):.2f} seconds",
                     self.styles['BodyText']
                 ))
                 story.append(Spacer(1, 0.2*inch))
+            
+            # Latency section with percentiles
+            if 'average_latency' in latency_stats:
+                story.append(Paragraph("Request Latency", self.styles['SubsectionHeader']))
+                
+                # Basic stats
+                basic_stats = (
+                    f"<b>Average:</b> {latency_stats['average_latency']*1000:.2f} ms<br/>"
+                    f"<b>Minimum:</b> {latency_stats['min_latency']*1000:.2f} ms<br/>"
+                    f"<b>Maximum:</b> {latency_stats['max_latency']*1000:.2f} ms"
+                )
+                
+                # Percentile stats (if available)
+                if 'p50_latency' in latency_stats:
+                    basic_stats += (
+                        f"<br/><br/><b>Latency Percentiles:</b><br/>"
+                        f"<b>p50 (median):</b> {latency_stats['p50_latency']*1000:.2f} ms - 50% of requests are faster<br/>"
+                        f"<b>p95:</b> {latency_stats['p95_latency']*1000:.2f} ms - 95% of requests are faster<br/>"
+                        f"<b>p99:</b> {latency_stats['p99_latency']*1000:.2f} ms - 99% of requests are faster"
+                    )
+                
+                story.append(Paragraph(basic_stats, self.styles['BodyText']))
+                story.append(Spacer(1, 0.2*inch))
+                
+                # Add latency chart if percentiles are available
+                if 'p50_latency' in latency_stats:
+                    latency_chart = self._generate_latency_chart(latency_stats)
+                    story.append(Image(latency_chart, width=6*inch, height=4*inch))
+                    story.append(Spacer(1, 0.2*inch))
+                
+                # Interpretation
+                story.append(Paragraph(
+                    "<b>Understanding Percentiles:</b> Percentiles show the distribution of latency across all requests. "
+                    "For example, p95 indicates that 95% of requests completed faster than this time, "
+                    "helping identify worst-case user experiences.",
+                    self.styles['BodyText']
+                ))
             
             story.append(PageBreak())
         
@@ -590,12 +670,17 @@ def load_evaluation_results(dataset_name, results_dir="results"):
         
         results['metrics'] = metrics
         
-        # Calculate latency stats
+        # Calculate enhanced latency stats with percentiles
         if response_times:
             results['latency_stats'] = {
                 'average_latency': np.mean(response_times),
                 'min_latency': np.min(response_times),
-                'max_latency': np.max(response_times)
+                'max_latency': np.max(response_times),
+                'p50_latency': np.percentile(response_times, 50),
+                'p95_latency': np.percentile(response_times, 95),
+                'p99_latency': np.percentile(response_times, 99),
+                'total_prompts': len(data)
+                # Note: throughput and total_time not available when loading from files
             }
     
     return results
