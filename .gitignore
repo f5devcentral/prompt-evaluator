@@ -60,6 +60,9 @@ safety-report.json
 *.swo
 *~
 
+# Warp AI context
+WARP.md
+
 # OS
 .DS_Store
 .DS_Store?

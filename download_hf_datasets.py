@@ -41,6 +41,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 import json
+from tqdm import tqdm
 
 
 def save_dataset_to_file(df: pd.DataFrame, file_path: str, format_type: str) -> None:
@@ -51,7 +52,7 @@ def save_dataset_to_file(df: pd.DataFrame, file_path: str, format_type: str) -> 
     if format_type == 'json':
         # Write as JSONL
         with open(file_path, 'w') as f:
-            for _, row in df.iterrows():
+            for _, row in tqdm(df.iterrows(), total=len(df), desc="Saving"):
                 json.dump(row.to_dict(), f, ensure_ascii=False)
                 f.write('\n')
     
@@ -151,7 +152,9 @@ class HFDatasetDownloader:
                         split: str = "train",
                         max_samples: Optional[int] = None,
                         output_file: Optional[str] = None,
+                        text_column: Optional[str] = None,
                         label_column: Optional[str] = None,
+                        label_columns: Optional[List[str]] = None,
                         no_label: bool = False,
                         output_format: str = "json") -> str:
         """
@@ -193,25 +196,74 @@ class HFDatasetDownloader:
                 df = df.head(max_samples)
                 print(f"   Limited to {max_samples} samples")
             
-            # Generate output filename if not provided
+            # Determine file extension
+            if output_format == 'json':
+                extension = 'jsonl'
+            elif output_format == 'csv':
+                extension = 'csv'
+            elif output_format == 'tsv':
+                extension = 'tsv'
+            elif output_format == 'parquet':
+                extension = 'parquet'
+            else:
+                extension = 'jsonl'  # Default fallback
+            
+            safe_name = dataset_name.replace("/", "_").replace("-", "_")
+            
+            # Handle multiple label columns: generate one file per label column
+            if label_columns and len(label_columns) > 1:
+                output_paths = []
+                for lc in label_columns:
+                    if lc not in df.columns:
+                        print(f"⚠️  Warning: Label column '{lc}' not found in dataset. Skipping. Available columns: {list(df.columns)}")
+                        continue
+                    
+                    per_label_file = f"{safe_name}_{split}_{lc}.{extension}"
+                    per_label_path = self.output_dir / per_label_file
+                    
+                    converted_df = self._convert_to_prompt_format(df, dataset_name, text_column, lc, no_label)
+                    save_dataset_to_file(converted_df, per_label_path, output_format)
+                    
+                    true_count = (converted_df['expected'] == 'true').sum()
+                    false_count = (converted_df['expected'] == 'false').sum()
+                    print(f"✅ Dataset saved to: {per_label_path}")
+                    print(f"   Label column: '{lc}' | true: {true_count}, false: {false_count}")
+                    print(f"   Format: {output_format.upper()} with 'prompt' and 'expected' columns")
+                    print(f"   Records: {converted_df.shape[0]} rows, {converted_df.shape[1]} columns")
+                    output_paths.append(str(per_label_path))
+                
+                # Generate combined file with OR logic across all label columns
+                valid_label_cols = [lc for lc in label_columns if lc in df.columns]
+                if len(valid_label_cols) > 1:
+                    combined_file = f"{safe_name}_{split}_combined.{extension}"
+                    combined_path = self.output_dir / combined_file
+                    
+                    combined_df = self._convert_to_prompt_format_combined(
+                        df, dataset_name, text_column, valid_label_cols
+                    )
+                    save_dataset_to_file(combined_df, combined_path, output_format)
+                    
+                    true_count = (combined_df['expected'] == 'true').sum()
+                    false_count = (combined_df['expected'] == 'false').sum()
+                    print(f"✅ Combined dataset saved to: {combined_path}")
+                    print(f"   Label columns (OR): {valid_label_cols} | true: {true_count}, false: {false_count}")
+                    print(f"   Format: {output_format.upper()} with 'prompt' and 'expected' columns")
+                    print(f"   Records: {combined_df.shape[0]} rows, {combined_df.shape[1]} columns")
+                    output_paths.append(str(combined_path))
+                
+                return ", ".join(output_paths)
+            
+            # Single label column (original behavior)
             if not output_file:
-                safe_name = dataset_name.replace("/", "_").replace("-", "_")
-                if output_format == 'json':
-                    extension = 'jsonl'
-                elif output_format == 'csv':
-                    extension = 'csv'
-                elif output_format == 'tsv':
-                    extension = 'tsv'
-                elif output_format == 'parquet':
-                    extension = 'parquet'
-                else:
-                    extension = 'jsonl'  # Default fallback
                 output_file = f"{safe_name}_{split}.{extension}"
             
             output_path = self.output_dir / output_file
             
+            # Use the first label_columns entry if provided as single
+            effective_label_column = label_columns[0] if label_columns and len(label_columns) == 1 else label_column
+            
             # Convert to the required format for prompt evaluation
-            converted_df = self._convert_to_prompt_format(df, dataset_name, label_column, no_label)
+            converted_df = self._convert_to_prompt_format(df, dataset_name, text_column, effective_label_column, no_label)
             
             # Save the dataset in the specified format
             save_dataset_to_file(converted_df, output_path, output_format)
@@ -226,7 +278,8 @@ class HFDatasetDownloader:
             print(f"❌ Error downloading dataset: {e}")
             raise
     
-    def _convert_to_prompt_format(self, df: pd.DataFrame, dataset_name: str, 
+    def _convert_to_prompt_format(self, df: pd.DataFrame, dataset_name: str,
+                                 text_column: Optional[str] = None,
                                  label_column: Optional[str] = None, no_label: bool = False) -> pd.DataFrame:
         """
         Convert a dataset to the format required by prompt evaluators.
@@ -236,7 +289,7 @@ class HFDatasetDownloader:
         print("🔄 Converting to prompt evaluation format...")
         
         # Try to identify the best columns for prompt and label
-        prompt_col, auto_label_col = self._identify_columns(df, dataset_name)
+        prompt_col, auto_label_col = self._identify_columns(df, dataset_name, text_column)
         
         if prompt_col is None:
             raise ValueError("Could not identify a suitable text column for prompts")
@@ -258,7 +311,7 @@ class HFDatasetDownloader:
         # Create the converted dataset
         converted_data = []
         
-        for _, row in df.iterrows():
+        for _, row in tqdm(df.iterrows(), total=len(df), desc="Converting"):
             prompt_text = str(row[prompt_col])
             
             # Determine expected result
@@ -302,13 +355,49 @@ class HFDatasetDownloader:
         print(f"   Converted {len(converted_df)} samples")
         return converted_df
     
-    def _identify_columns(self, df: pd.DataFrame, dataset_name: str) -> tuple:
+    def _convert_to_prompt_format_combined(self, df: pd.DataFrame, dataset_name: str,
+                                            text_column: Optional[str],
+                                            label_columns: List[str]) -> pd.DataFrame:
+        """
+        Convert a dataset using OR logic across multiple label columns.
+        A prompt is marked 'true' if ANY of the label columns is positive.
+        """
+        print(f"🔄 Converting to combined format (OR across {label_columns})...")
+        
+        prompt_col, _ = self._identify_columns(df, dataset_name, text_column)
+        if prompt_col is None:
+            raise ValueError("Could not identify a suitable text column for prompts")
+        
+        converted_data = []
+        for _, row in tqdm(df.iterrows(), total=len(df), desc="Converting (combined)"):
+            prompt_text = str(row[prompt_col])
+            
+            # OR logic: true if any label column is positive
+            expected_result = "false"
+            for lc in label_columns:
+                label = row[lc]
+                if isinstance(label, (int, float)) and label > 0:
+                    expected_result = "true"
+                    break
+                elif isinstance(label, str) and label.lower() in ['true', '1', 'yes', 'positive', 'flagged', 'malicious']:
+                    expected_result = "true"
+                    break
+            
+            converted_data.append({
+                'prompt': prompt_text,
+                'expected': expected_result
+            })
+        
+        return pd.DataFrame(converted_data)
+    
+    def _identify_columns(self, df: pd.DataFrame, dataset_name: str,
+                          text_column: Optional[str] = None) -> tuple:
         """Identify the best columns for prompt text and labels."""
         columns = list(df.columns)
         
         # Common text column names
         text_candidates = [
-            'text', 'content', 'prompt', 'input', 'sentence', 'review', 
+            'text', 'content', 'prompt', 'input', 'user_input', 'sentence', 'review', 
             'comment', 'tweet', 'message', 'description', 'summary',
             'question', 'context', 'passage', 'article'
         ]
@@ -318,22 +407,38 @@ class HFDatasetDownloader:
             'label', 'labels', 'target', 'class', 'category', 'sentiment',
             'score', 'rating', 'outcome', 'result', 'flag', 'is_positive',
             'is_negative', 'is_toxic', 'is_hate', 'malicious', 'benign',
-            'toxic', 'hate', 'spam', 'fraud', 'phishing'
+            'toxic', 'toxicity', 'hate', 'spam', 'fraud', 'phishing',
+            'jailbreaking', 'jailbreak'
         ]
         
-        # Find text column
+        # Use explicitly specified text column if provided
         prompt_col = None
-        for candidate in text_candidates:
-            if candidate in columns:
-                prompt_col = candidate
-                break
+        if text_column:
+            if text_column in columns:
+                prompt_col = text_column
+                print(f"   Using specified text column: '{text_column}'")
+            else:
+                print(f"   Warning: Specified text column '{text_column}' not found. Available columns: {columns}")
+        
+        # Find text column by common names
+        if prompt_col is None:
+            for candidate in text_candidates:
+                if candidate in columns:
+                    prompt_col = candidate
+                    break
         
         # If no exact match, look for columns with text-like content
+        # Use is_string_dtype to handle both object and pd.StringDtype (used by HuggingFace datasets)
         if prompt_col is None:
             for col in columns:
-                if df[col].dtype == 'object' and df[col].str.len().mean() > 10:
-                    prompt_col = col
-                    break
+                if pd.api.types.is_string_dtype(df[col]):
+                    try:
+                        mean_len = df[col].dropna().astype(str).str.len().mean()
+                        if mean_len > 10:
+                            prompt_col = col
+                            break
+                    except Exception:
+                        continue
         
         # Find label column
         label_col = None
@@ -505,8 +610,17 @@ Examples:
         help="List available splits for a dataset"
     )
     parser.add_argument(
+        "--text-column", "-t",
+        help="Name of the column to use as the prompt text (e.g., 'augq', 'text', 'prompt')"
+    )
+    parser.add_argument(
         "--label-column",
         help="Name of the column to use as ground truth labels (e.g., 'malicious', 'label', 'target')"
+    )
+    parser.add_argument(
+        "--label-columns",
+        nargs='+',
+        help="Multiple label columns to generate separate dataset files for each (e.g., '--label-columns toxicity jailbreaking'). Overrides --label-column."
     )
     parser.add_argument(
         "--no-label",
@@ -542,13 +656,19 @@ Examples:
         elif args.list_splits:
             downloader.list_dataset_splits(args.list_splits, args.config)
         elif args.dataset:
+            # Resolve label columns: --label-columns takes precedence over --label-column
+            label_columns = args.label_columns
+            label_column = args.label_column if not label_columns else None
+            
             output_path = downloader.download_dataset(
                 dataset_name=args.dataset,
                 config=args.config,
                 split=args.split,
                 max_samples=args.max_samples,
                 output_file=args.output,
-                label_column=args.label_column,
+                text_column=args.text_column,
+                label_column=label_column,
+                label_columns=label_columns,
                 no_label=args.no_label,
                 output_format=args.format
             )
