@@ -6,13 +6,13 @@
 
 <p align="center">
   <!-- Build and Quality -->
-  <a href="https://gitlab.com/Artemouse/prompt-evaluator/commits/master">
-    <img src="https://gitlab.com/Artemouse/prompt-evaluator/badges/master/pipeline.svg?cache=none" alt="Pipeline Status">
+  <a href="https://github.com/f5devcentral/prompt-evaluator/actions">
+    <img src="https://github.com/f5devcentral/prompt-evaluator/actions/workflows/ci.yml/badge.svg" alt="CI Status">
   </a>
-  <img src="https://img.shields.io/gitlab/last-commit/Artemouse/prompt-evaluator?color=6f42c1&label=Last%20Commit" alt="Last Commit">
+  <img src="https://img.shields.io/github/last-commit/f5devcentral/prompt-evaluator?color=6f42c1&label=Last%20Commit" alt="Last Commit">
 
   <!-- Version & License -->
-  <img src="https://img.shields.io/badge/version-2.0-blue?logo=gitlab&logoColor=white" alt="Version 2.0">
+  <img src="https://img.shields.io/badge/version-2.0-blue?logo=github&logoColor=white" alt="Version 2.0">
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/license-MIT-success.svg" alt="License: MIT">
   </a>

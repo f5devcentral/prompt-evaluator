@@ -234,7 +234,7 @@ def generate_cheat_sheet(output_path=None):
     story.append(Paragraph("1. Setup", S['SectionHeader']))
     story.append(Paragraph("Clone the repository:", S['Body']))
     story.extend(_code_block(
-        "git clone https://gitlab.com/Artemouse/prompt-evaluator.git<br/>"
+        "git clone https://github.com/f5devcentral/prompt-evaluator.git<br/>"
         "cd prompt-evaluator",
         S
     ))
