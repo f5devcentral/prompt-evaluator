@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2025 Andy Ryan
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 #!/usr/bin/env python3
 """
 Prompt Injection Evaluator (Prompts API)
@@ -21,6 +43,7 @@ from datetime import datetime
 from urllib.parse import urljoin
 from dotenv import load_dotenv
 from pocketflow import Node, BatchNode, Flow
+from tools.enhanced_dataset_reader import load_dataset_enhanced
 
 
 def write_results_to_file(data, file_path, format_type):
@@ -160,7 +183,7 @@ def calypsoai_prompt(prompt, project=None, provider=None, verbose=False):
 
 # Node to load the dataset
 class LoadDatasetNode(Node):
-    """Loads the prompt injection dataset from a CSV file."""
+    """Loads the prompt injection dataset from a file (supports JSONL, CSV, TSV, Parquet, pipe-delimited)."""
     
     def prep(self, shared):
         input_file = shared.get("input_file", "prompt_inject_dataset.csv")
@@ -169,47 +192,18 @@ class LoadDatasetNode(Node):
     
     def exec(self, inputs):
         input_file, max_lines = inputs
-        dataset = []
-        line_count = 0
         
         try:
-            with open(input_file, 'r') as infile:
-                for line in infile:
-                    # Check if we've reached the maximum number of lines
-                    if max_lines is not None and line_count >= max_lines:
-                        break
-                        
-                    line = line.strip()
-                    if not line:
-                        continue
-                    
-                    # Split line by | and strip surrounding quotation marks
-                    parts = line.split('|')
-                    if len(parts) < 2:
-                        continue
-                    
-                    prompt = parts[0].strip().strip('"').strip("'")
-                    expected = parts[1].strip().lower() if len(parts) > 1 else "unknown"
-                    
-                    dataset.append({
-                        "prompt": prompt,
-                        "expected": expected,
-                        "original_line": line
-                    })
-                    
-                    line_count += 1
-            
+            dataset = load_dataset_enhanced(input_file, max_lines)
             print(f"Loaded {len(dataset)} lines from {input_file}")
             return dataset
         except FileNotFoundError:
             error_msg = f"Error: Input file '{input_file}' not found. Please check the file path and try again."
             print(error_msg)
-            # Return an empty dataset to allow the flow to continue
             return []
         except Exception as e:
             error_msg = f"Error reading file '{input_file}': {str(e)}"
             print(error_msg)
-            # Return an empty dataset to allow the flow to continue
             return []
     
     def post(self, shared, prep_res, exec_res):

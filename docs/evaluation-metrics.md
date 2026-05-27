@@ -172,9 +172,116 @@ Recommended Metrics: F1 Score as primary, all metrics for comprehensive analysis
 - Balance is key - don't sacrifice one metric completely for another
 - Use F1 score to find the optimal balance point
 
+## Performance Metrics
+
+### Throughput
+- **Definition**: Number of prompts processed per second
+- **Formula**: `Total Prompts / Total Elapsed Time`
+- **Units**: prompts/sec
+- **Interpretation**:
+  - Higher is better
+  - Sequential: Baseline performance (typically 1-3 prompts/sec)
+  - Concurrent: Parallel performance (can be 5-20x sequential)
+- **When to Use**: Comparing processing efficiency, capacity planning
+
+**Example**:
+```
+Total Prompts: 100
+Total Time: 45.23 seconds
+Throughput: 100 / 45.23 = 2.21 prompts/sec
+```
+
+### Request Latency
+- **Definition**: Time taken for individual API calls
+- **Units**: milliseconds (ms)
+- **Key Statistics**:
+  - **Average**: Mean latency across all requests
+  - **Minimum**: Fastest request
+  - **Maximum**: Slowest request
+  - **p50 (Median)**: 50% of requests are faster than this
+  - **p95**: 95% of requests are faster than this
+  - **p99**: 99% of requests are faster than this
+
+**Why Percentiles Matter**:
+- Average can be misleading due to outliers
+- p50 shows typical user experience
+- p95/p99 reveal worst-case scenarios
+
+**Example**:
+```
+Average: 688 ms
+Minimum: 435 ms
+Maximum: 2291 ms
+p50: 522 ms  <- Half of requests are faster than this
+p95: 1510 ms <- Only 5% of requests are slower
+p99: 2135 ms <- Only 1% of requests are slower
+```
+
+### Total Elapsed Time
+- **Definition**: Wall-clock time from start to finish
+- **Units**: seconds
+- **Note**: Sequential runs include API latency only; concurrent runs include parallelization benefits
+
+## Comparing Sequential vs Concurrent Performance
+
+Both evaluators now report consistent performance metrics for easy comparison:
+
+### Sequential Evaluator Output
+```
+Performance Metrics:
+===================
+
+Throughput:
+-----------
+Overall: 1.45 prompts/sec
+Total Prompts: 10
+Total Elapsed Time: 6.91 seconds
+
+Request Latency (API call time):
+--------------------------------
+Average: 688.06 ms
+p50 (median): 522.55 ms
+p95: 1509.91 ms
+p99: 2134.86 ms
+```
+
+### Concurrent Evaluator Output
+```
+Concurrent Performance Metrics:
+==============================
+
+Configuration:
+--------------
+Concurrent Workers: 10
+
+Throughput:
+-----------
+Overall: 6.53 prompts/sec
+Total Prompts: 100
+Total Elapsed Time: 15.32 seconds
+
+Request Latency (API call time):
+--------------------------------
+Average: 245.12 ms
+p50 (median): 221.67 ms
+p95: 456.78 ms
+p99: 1234.56 ms
+
+Queue Time (waiting for worker):
+--------------------------------
+Average: 12.34 ms
+```
+
+### Key Differences
+- **Sequential**: Shows baseline API performance without parallelization
+- **Concurrent**: Adds queue time metrics and worker distribution
+- **Throughput**: Concurrent should show significant improvement (5-20x)
+- **Latency**: Should be similar if API is not overloaded
+
 ## Additional Resources
 
 - Review the exported false positives and false negatives files for detailed analysis
 - Use the confusion matrix to understand specific failure patterns
 - Consider creating custom datasets that match your specific use case
 - Regular evaluation helps track scanner performance over time
+- Compare sequential vs concurrent runs to understand API scaling behavior

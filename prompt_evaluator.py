@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2025 Andy Ryan
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 #!/usr/bin/env python3
 """
 Prompt Injection Evaluator
@@ -19,6 +41,7 @@ from datetime import datetime
 from urllib.parse import urljoin
 from dotenv import load_dotenv
 from pocketflow import Node, BatchNode, Flow
+import numpy as np
 
 # Load environment variables
 load_dotenv()
@@ -207,6 +230,7 @@ class ScanPromptsNode(BatchNode):
         self.total_prompts = 0
         self.response_times = []
         self.prompt_sizes = []
+        self.start_time = None
     
     def prep(self, shared):
         dataset = shared["dataset"]
@@ -217,6 +241,7 @@ class ScanPromptsNode(BatchNode):
             return []
             
         print(f"\nStarting scan of {self.total_prompts} prompts...")
+        self.start_time = time.time()
         return dataset
     
     def exec(self, item):
@@ -264,10 +289,12 @@ class ScanPromptsNode(BatchNode):
             }
     
     def post(self, shared, prep_res, exec_res_list):
+        elapsed_time = time.time() - self.start_time if self.start_time else 0
         shared["scan_results"] = exec_res_list
         shared["response_times"] = self.response_times
         shared["prompt_sizes"] = self.prompt_sizes
-        print(f"Completed scanning {len(exec_res_list)} prompts.")
+        shared["total_scan_time"] = elapsed_time
+        print(f"Completed scanning {len(exec_res_list)} prompts in {elapsed_time:.2f} seconds.")
         # print(f"DEBUG: ScanPromptsNode stored {len(exec_res_list)} results in shared data")
         # if exec_res_list:
         #     print(f"DEBUG: First scan result: {exec_res_list[0]}")
@@ -602,10 +629,11 @@ class LatencyStatsNode(Node):
         response_times = shared.get("response_times", [])
         prompt_sizes = shared.get("prompt_sizes", [])
         scan_results = shared.get("scan_results", [])
-        return response_times, prompt_sizes, scan_results
+        total_scan_time = shared.get("total_scan_time", 0)
+        return response_times, prompt_sizes, scan_results, total_scan_time
     
     def exec(self, inputs):
-        response_times, prompt_sizes, scan_results = inputs
+        response_times, prompt_sizes, scan_results, total_scan_time = inputs
         
         if not response_times or not prompt_sizes:
             return "No response time or prompt size data available. No prompts were processed."
@@ -619,14 +647,25 @@ class LatencyStatsNode(Node):
         # Unzip the valid data
         valid_times, valid_sizes, valid_results = zip(*valid_data)
         
+        # Convert to milliseconds for consistency with concurrent evaluator
+        valid_times_ms = [t * 1000 for t in valid_times]
+        
         # Calculate response time statistics
-        avg_time = sum(valid_times) / len(valid_times)
-        min_time = min(valid_times)
-        max_time = max(valid_times)
+        avg_time = np.mean(valid_times_ms)
+        min_time = np.min(valid_times_ms)
+        max_time = np.max(valid_times_ms)
+        
+        # Calculate percentiles
+        p50 = np.percentile(valid_times_ms, 50)
+        p95 = np.percentile(valid_times_ms, 95)
+        p99 = np.percentile(valid_times_ms, 99)
+        
+        # Calculate throughput
+        throughput = len(scan_results) / total_scan_time if total_scan_time > 0 else 0
         
         # Find the prompts with min and max response times
-        min_time_idx = valid_times.index(min_time)
-        max_time_idx = valid_times.index(max_time)
+        min_time_idx = valid_times_ms.index(min_time)
+        max_time_idx = valid_times_ms.index(max_time)
         min_time_prompt = valid_results[min_time_idx]["prompt"]
         max_time_prompt = valid_results[max_time_idx]["prompt"]
         min_time_size = valid_sizes[min_time_idx]
@@ -639,25 +678,37 @@ class LatencyStatsNode(Node):
         
         # Format the output
         output = f"""
-Latency Statistics:
-------------------
-Average Response Time: {avg_time:.4f} seconds
-Minimum Response Time: {min_time:.4f} seconds (Prompt Size: {min_time_size} chars)
-Maximum Response Time: {max_time:.4f} seconds (Prompt Size: {max_time_size} chars)
+Performance Metrics:
+===================
+
+Throughput:
+-----------
+Overall: {throughput:.2f} prompts/sec
+Total Prompts: {len(scan_results)}
+Total Elapsed Time: {total_scan_time:.2f} seconds
+
+Request Latency (API call time):
+--------------------------------
+Average: {avg_time:.2f} ms
+Minimum: {min_time:.2f} ms
+Maximum: {max_time:.2f} ms
+p50 (median): {p50:.2f} ms
+p95: {p95:.2f} ms
+p99: {p99:.2f} ms
 Total Requests: {len(valid_times)}/{len(response_times)} valid responses
 
 Prompt Size Statistics:
----------------------
+----------------------
 Average Prompt Size: {avg_size:.1f} characters
 Minimum Prompt Size: {min_size} characters
 Maximum Prompt Size: {max_size} characters
 
 Sample Prompts:
 --------------
-Fastest Response ({min_time:.4f}s):
+Fastest Response ({min_time:.2f}ms):
 "{min_time_prompt[:100]}{'...' if len(min_time_prompt) > 100 else ''}"
 
-Slowest Response ({max_time:.4f}s):
+Slowest Response ({max_time:.2f}ms):
 "{max_time_prompt[:100]}{'...' if len(max_time_prompt) > 100 else ''}"
 """
         return output
@@ -675,19 +726,20 @@ class GeneratePDFReportNode(Node):
         try:
             import reportlab
         except ImportError:
-            return None, None
+            return None, None, None, None
         
         evaluation_results = shared.get("evaluation_results", {})
         scan_results = shared.get("scan_results", [])
         input_file = shared.get("input_file", "prompt_inject_dataset.csv")
+        total_scan_time = shared.get("total_scan_time", 0)
         
         # Extract dataset name from input file
         dataset_name = os.path.splitext(os.path.basename(input_file))[0]
         
-        return evaluation_results, dataset_name, scan_results
+        return evaluation_results, dataset_name, scan_results, total_scan_time
     
     def exec(self, inputs):
-        evaluation_results, dataset_name, scan_results = inputs
+        evaluation_results, dataset_name, scan_results, total_scan_time = inputs
         
         # Skip if dependencies not available
         if evaluation_results is None:
@@ -722,15 +774,24 @@ class GeneratePDFReportNode(Node):
                 elif expected == 'true' and outcome == 'cleared':
                     false_negatives.append(result)
             
-            # Calculate latency statistics
+            # Calculate enhanced latency statistics with percentiles
             response_times = [r.get('response_time') for r in scan_results if r.get('response_time') is not None]
             latency_stats = None
             
             if response_times:
+                # Convert to milliseconds for consistency
+                response_times_ms = [t * 1000 for t in response_times]
+                
                 latency_stats = {
-                    'average_latency': sum(response_times) / len(response_times),
-                    'min_latency': min(response_times),
-                    'max_latency': max(response_times)
+                    'average_latency': np.mean(response_times_ms) / 1000,  # Keep in seconds for PDF compatibility
+                    'min_latency': np.min(response_times_ms) / 1000,
+                    'max_latency': np.max(response_times_ms) / 1000,
+                    'p50_latency': np.percentile(response_times_ms, 50) / 1000,
+                    'p95_latency': np.percentile(response_times_ms, 95) / 1000,
+                    'p99_latency': np.percentile(response_times_ms, 99) / 1000,
+                    'throughput': len(scan_results) / total_scan_time if total_scan_time > 0 else 0,
+                    'total_time': total_scan_time,
+                    'total_prompts': len(scan_results)
                 }
             
             # Generate report
