@@ -129,6 +129,19 @@ pre-commit: lint format type-check test-core
 ci-test: install-test lint format type-check test-core security
 	@echo "GitLab CI/CD simulation completed!"
 
+# GitHub Actions CI simulation
+ci-github: install-test test-simple test-converter test-reader test-integration
+	@echo "Running feature tests..."
+	python test_ci_features.py
+	@echo "Running lint checks..."
+	-flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+	-flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+	-black --check --diff .
+	@echo "Running security scans..."
+	-bandit -r . -f json -o bandit-report.json
+	-safety check --json --output safety-report.json
+	@echo "GitHub Actions CI simulation completed!"
+
 # Development workflow
 dev-test: test-simple test-converter
 	@echo "Development tests completed!"
