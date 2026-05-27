@@ -101,7 +101,7 @@ def check_environment_variables():
     
     required_vars = {
         'CALYPSOAI_URL': 'CalypsoAI API URL',
-        'CALYPSOAI_TOKEN': 'CalypsoAI API token'
+        'CALYPSOAI_TOKEN': 'CalypsoAI API token'  # nosec B105
     }
     
     missing_vars = []
@@ -136,7 +136,7 @@ def check_calypsoai_api():
         }
         
         # Test API endpoint
-        response = requests.get(f"{base_url}/health", headers=headers)
+        response = requests.get(f"{base_url}/health", headers=headers, timeout=30)
         response.raise_for_status()
         
         print("✅ CalypsoAI API check passed")

@@ -1,0 +1,4 @@
+[bandit]
+# Exclude test files and directories — B101 (assert) noise dominates otherwise
+exclude_dirs = tests,test_datasets,.venv,venv
+skips = B101

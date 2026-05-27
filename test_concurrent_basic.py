@@ -77,16 +77,16 @@ def test_concurrent_scan_node_attributes():
     
     node = ConcurrentScanPromptsNode(concurrency=15, rate_limit=25)
     
-    assert node.concurrency == 15, "Concurrency not set correctly"
+    assert node.concurrency == 15, "Concurrency not set correctly"  # nosec B101
     print("✓ Concurrency set correctly")
     
-    assert node.rate_limit == 25, "Rate limit not set correctly"
+    assert node.rate_limit == 25, "Rate limit not set correctly"  # nosec B101
     print("✓ Rate limit set correctly")
     
-    assert node.session is not None, "Session not initialized"
+    assert node.session is not None, "Session not initialized"  # nosec B101
     print("✓ Session initialized")
     
-    assert node.progress_lock is not None, "Progress lock not initialized"
+    assert node.progress_lock is not None, "Progress lock not initialized"  # nosec B101
     print("✓ Progress lock initialized")
     
     print("\nAll attributes verified!")
