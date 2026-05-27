@@ -165,7 +165,7 @@ def calypsoai_prompt(prompt, project=None, provider=None, verbose=False):
     # Record start time
     start_time = time.time()
     
-    response = requests.post(url, headers=headers, json=payload)
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
     response.raise_for_status()
     
     # Calculate elapsed time

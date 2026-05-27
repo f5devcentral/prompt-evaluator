@@ -29,7 +29,7 @@ focusing on core dataset conversion and reading functionality.
 """
 
 import sys
-import subprocess
+import subprocess  # nosec B404
 import argparse
 from pathlib import Path
 
@@ -42,7 +42,7 @@ def run_command(cmd, description):
     print(f"{'='*60}")
     
     try:
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)  # nosec B603
         print("✅ SUCCESS")
         if result.stdout:
             print("Output:", result.stdout)

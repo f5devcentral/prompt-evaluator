@@ -30,7 +30,7 @@ including installing dependencies, creating test data, and validating the setup.
 
 import os
 import sys
-import subprocess
+import subprocess  # nosec B404
 import tempfile
 from pathlib import Path
 
@@ -41,7 +41,7 @@ def run_command(cmd, description, check=True):
     print(f"   Command: {' '.join(cmd)}")
     
     try:
-        result = subprocess.run(cmd, check=check, capture_output=True, text=True)
+        result = subprocess.run(cmd, check=check, capture_output=True, text=True)  # nosec B603
         if result.stdout:
             print(f"   Output: {result.stdout.strip()}")
         return True

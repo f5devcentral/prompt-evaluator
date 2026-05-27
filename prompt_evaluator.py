@@ -76,7 +76,7 @@ def calypsoai_scan(prompt):
     # Record start time
     start_time = time.time()
     
-    response = requests.post(url, headers=headers, json=payload)
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
     
     # Debug: Print response details
     # print(f"\n--- Response Details ---")

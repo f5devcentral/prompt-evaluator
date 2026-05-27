@@ -28,13 +28,13 @@ This script tests core features without requiring external API tokens.
 
 import sys
 import os
-import subprocess
+import subprocess  # nosec B404
 import tempfile
 
 def test_tool_help(tool_name, tool_path):
     """Test that a tool shows help without errors."""
     try:
-        result = subprocess.run([sys.executable, tool_path, "--help"], 
+        result = subprocess.run([sys.executable, tool_path, "--help"],  # nosec B603
                               capture_output=True, text=True, timeout=30)
         if result.returncode == 0:
             print(f"✅ {tool_name} help works")
@@ -56,7 +56,7 @@ def test_tool_with_env(tool_name, tool_path, env_vars=None):
         if env_vars:
             env.update(env_vars)
         
-        result = subprocess.run([sys.executable, tool_path, "--help"], 
+        result = subprocess.run([sys.executable, tool_path, "--help"],  # nosec B603
                               capture_output=True, text=True, timeout=30, env=env)
         if result.returncode == 0:
             print(f"✅ {tool_name} help works with env vars")
@@ -82,7 +82,7 @@ def test_basic_functionality():
         # Test basic data operations
         data = [{"prompt": "Test", "expected": "false"}]
         df = pd.DataFrame(data)
-        assert len(df) == 1
+        assert len(df) == 1  # nosec B101
         print("✅ Basic data operations work")
         
         return True
@@ -122,8 +122,8 @@ def main():
     
     # Test tools that require environment variables
     env_tools = [
-        ("Prompt Evaluator", "prompt_evaluator.py", {"CALYPSOAI_TOKEN": "test_token_12345"}),
-        ("Prompt Evaluator Prompts", "prompt_evaluator_prompts.py", {"CALYPSOAI_TOKEN": "test_token_12345"})
+        ("Prompt Evaluator", "prompt_evaluator.py", {"CALYPSOAI_TOKEN": "test_token_12345"}),  # nosec B105
+        ("Prompt Evaluator Prompts", "prompt_evaluator_prompts.py", {"CALYPSOAI_TOKEN": "test_token_12345"})  # nosec B105
     ]
     
     for tool_name, tool_path, env_vars in env_tools:

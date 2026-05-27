@@ -132,7 +132,7 @@ def environment_variables():
     """Mock environment variables for testing."""
     return {
         "CALYPSOAI_URL": "https://test.calypsoai.app",
-        "CALYPSOAI_TOKEN": "test_token_12345"
+        "CALYPSOAI_TOKEN": "test_token_12345"  # nosec B105
     }
 
 

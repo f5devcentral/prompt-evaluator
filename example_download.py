@@ -28,7 +28,8 @@ This script shows how to programmatically download and use datasets
 from Hugging Face for prompt evaluation.
 """
 
-import subprocess
+import shlex
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 
@@ -40,7 +41,7 @@ def run_command(cmd, description):
     print("-" * 50)
     
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        result = subprocess.run(shlex.split(cmd), capture_output=True, text=True)  # nosec B603
         if result.returncode == 0:
             print("✅ Success!")
             if result.stdout:

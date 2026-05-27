@@ -178,7 +178,8 @@ class HFDatasetDownloader:
         try:
             # Load the dataset
             print("Loading dataset from Hugging Face...")
-            dataset = load_dataset(dataset_name, config, split=split)
+            # Dataset name is user-provided CLI input, revision pinning not applicable
+            dataset = load_dataset(dataset_name, config, split=split, trust_remote_code=False)  # nosec B615
             
             # Convert to pandas DataFrame
             if hasattr(dataset, 'to_pandas'):
@@ -437,7 +438,7 @@ class HFDatasetDownloader:
                         if mean_len > 10:
                             prompt_col = col
                             break
-                    except Exception:
+                    except (TypeError, ValueError, AttributeError):
                         continue
         
         # Find label column
@@ -503,7 +504,7 @@ class HFDatasetDownloader:
             # Also try to load a small sample to detect splits
             print("\n🔍 Detecting splits by loading dataset...")
             try:
-                dataset = load_dataset(dataset_name, config, split=None)
+                dataset = load_dataset(dataset_name, config, split=None, trust_remote_code=False)  # nosec B615
                 if isinstance(dataset, dict):
                     print(f"Available splits: {list(dataset.keys())}")
                     for split_name, split_data in dataset.items():
