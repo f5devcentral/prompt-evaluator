@@ -1,5 +1,6 @@
 # GitHub Actions CI Pipeline for Prompt Evaluator
 # Mirrors the GitLab CI pipeline (.gitlab-ci.yml)
+# Validated: 2026-05-27
 
 name: CI
 
