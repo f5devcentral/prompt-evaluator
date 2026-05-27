@@ -13,8 +13,8 @@
 
   <!-- Version & License -->
   <img src="https://img.shields.io/badge/version-2.0-blue?logo=github&logoColor=white" alt="Version 2.0">
-  <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/license-MIT-success.svg" alt="License: MIT">
+  <a href="https://www.apache.org/licenses/LICENSE-2.0">
+    <img src="https://img.shields.io/badge/license-Apache%202.0-success.svg" alt="License: Apache 2.0">
   </a>
 
   <!-- Language & Runtime -->
@@ -416,7 +416,7 @@ For common issues and solutions, see the [Troubleshooting Guide](docs/troublesho
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
