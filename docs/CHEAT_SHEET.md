@@ -3,7 +3,7 @@
 ## 1. Setup
 
 ```bash
-git clone https://gitlab.com/Artemouse/prompt-evaluator.git
+git clone https://github.com/f5devcentral/prompt-evaluator.git
 cd prompt-evaluator
 ```
 
