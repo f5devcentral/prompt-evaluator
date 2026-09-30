@@ -75,6 +75,11 @@ def main():
         cmd = base_cmd + ["tests/test_core_functionality.py", "-v"]
         if run_command(cmd, "Core Functionality Tests"):
             success_count += 1
+
+        total_count += 1
+        cmd = base_cmd + ["tests/test_scanner_resolution.py", "-v"]
+        if run_command(cmd, "Scanner Resolution Tests"):
+            success_count += 1
     
     # Dataset converter tests
     if args.converter or args.all:
