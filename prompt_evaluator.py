@@ -53,9 +53,132 @@ except KeyError:
     if not api_key:
         raise ValueError("CALYPSOAI_TOKEN environment variable not found")
 
+# ---------------------------------------------------------------------------
+# Scanner name resolution
+# ---------------------------------------------------------------------------
+# Scan responses identify scanners by opaque ID only. The /scanners endpoint
+# exposes the ID -> name mapping, but it is partitioned by "source", so the
+# full map is assembled by querying each known source once and caching the
+# merged result for the lifetime of the process.
+SCANNER_SOURCES = ("vendor", "system", "zip", "share", "internal")
+SCANNER_REQUEST_TIMEOUT = 30
+SCANNER_PAGE_LIMIT = 100
+
+# Cache sentinel. None means "never fetched"; a dict means "already fetched",
+# including an empty dict, which records a failed lookup so the API is not
+# re-queried once per prompt for the rest of the run.
+_scanner_map_cache = None
+
+
+def fetch_scanner_map(force_refresh=False):
+    """Build a mapping of scanner ID to human-readable scanner name.
+
+    The mapping is cached at module level because it is identical for every
+    prompt in a run; without caching this would cost one request per source
+    per prompt.
+
+    Args:
+        force_refresh (bool): Ignore any cached map and re-query the API.
+
+    Returns:
+        dict: {scanner_id: scanner_name}. Empty when every source failed,
+        which callers treat as "fall back to raw IDs" rather than fatal.
+
+    Edge cases:
+        - A failing source is warned about and skipped, so one bad source does
+          not discard scanners successfully read from the others.
+        - A total failure is cached as {} so the lookup is attempted only once.
+        - This is deliberately lazy. Calling it at import time would fire HTTP
+          requests simply by importing the module, which breaks CI and --help.
+    """
+    global _scanner_map_cache
+
+    if _scanner_map_cache is not None and not force_refresh:
+        return _scanner_map_cache
+
+    scanner_map = {}
+
+    with requests.Session() as session:
+        session.headers.update({'Authorization': f'Bearer {api_key}'})
+        for source in SCANNER_SOURCES:
+            try:
+                response = session.get(
+                    f"{base_url}/scanners",
+                    params={'source': source, 'limit': SCANNER_PAGE_LIMIT},
+                    timeout=SCANNER_REQUEST_TIMEOUT,
+                )
+                response.raise_for_status()
+                payload = response.json()
+            except (requests.RequestException, ValueError) as e:
+                print(f"Warning: could not fetch scanners for source '{source}': {e}")
+                continue
+
+            for scanner in payload.get("scanners", []) or []:
+                scanner_id = scanner.get("id")
+                if scanner_id:
+                    scanner_map[scanner_id] = scanner.get("name") or scanner_id
+
+    if not scanner_map:
+        print("Warning: scanner name lookup returned no scanners; "
+              "results will report raw scanner IDs.")
+
+    _scanner_map_cache = scanner_map
+    return scanner_map
+
+
+def extract_triggered_scanners(result_payload, scanner_map=None):
+    """Return the names of the scanners that did not pass for a single scan.
+
+    Args:
+        result_payload (dict): The 'result' object from a /scans response.
+        scanner_map (dict): Optional {id: name} mapping from
+            fetch_scanner_map(). When omitted, or when an ID is missing from
+            it, the raw scanner ID is used so the information is preserved
+            rather than replaced by a placeholder.
+
+    Returns:
+        list[str]: Triggered scanner names (or IDs), in API order.
+
+    Edge cases:
+        - Missing or non-list 'scannerResults' yields an empty list.
+        - Non-dict entries are skipped defensively.
+        - Entries with no 'outcome' count as triggered, since a result we
+          cannot classify is worth surfacing rather than silently dropping.
+    """
+    scanner_map = scanner_map or {}
+    scanner_results = result_payload.get('scannerResults') or []
+
+    if not isinstance(scanner_results, list):
+        return []
+
+    triggered = []
+    for scanner in scanner_results:
+        if not isinstance(scanner, dict):
+            continue
+        if str(scanner.get('outcome', '')).lower() == 'passed':
+            continue
+        scanner_id = scanner.get('scannerId')
+        if scanner_id is None:
+            continue
+        triggered.append(scanner_map.get(scanner_id, scanner_id))
+
+    return triggered
+
+
 # Utility function to scan a prompt using CalypsoAI
-def calypsoai_scan(prompt):
-    """Scan a prompt using the CalypsoAI API."""
+def calypsoai_scan(prompt, scanner_map=None):
+    """Scan a prompt using the CalypsoAI API.
+
+    Args:
+        prompt (str): The prompt text to scan.
+        scanner_map (dict): Optional {scanner_id: name} mapping used to label
+            the scanners that flagged the prompt. Raw IDs are reported when
+            this is absent.
+
+    Returns:
+        dict: 'outcome' (str), 'response_time' (float seconds) and 'scanners'
+        (list of triggered scanner names).
+    """
     headers = {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
@@ -89,19 +212,36 @@ def calypsoai_scan(prompt):
     
     # Handle the new API response format
     # The response now has: { "result": { "outcome": "flagged" } }
-    if 'result' in outcome and 'outcome' in outcome['result']:
-        result_outcome = outcome['result']['outcome']
-    else:
-        # Fallback to old format or other possible formats
-        result_outcome = outcome.get('result', {}).get('outcome', 'no_result')
+    result = outcome.get('result') or {}
+    if not isinstance(result, dict):
+        result = {}
+    result_outcome = result.get('outcome', 'no_result')
     
     return {
         'outcome': result_outcome,
-        'response_time': elapsed_time
+        'response_time': elapsed_time,
+        'scanners': extract_triggered_scanners(result, scanner_map)
     }
 
 # Import the enhanced dataset reader
 from tools.enhanced_dataset_reader import load_dataset_enhanced
+
+
+def _format_scanners(value):
+    """Flatten a scanners list into one delimited cell for flat text formats.
+
+    CSV and TSV cannot hold a list, so the names are joined with '; '. JSON and
+    Parquet keep the native list instead.
+
+    Args:
+        value: The record's 'scanners' entry; normally a list, possibly None.
+
+    Returns:
+        str: Delimited scanner names, or '' when there are none.
+    """
+    if isinstance(value, (list, tuple)):
+        return '; '.join(str(v) for v in value)
+    return '' if value is None else str(value)
 
 
 def write_results_to_file(data, file_path, format_type):
@@ -122,11 +262,11 @@ def write_results_to_file(data, file_path, format_type):
         # Write as CSV
         if not data:
             with open(file_path, 'w') as f:
-                f.write("prompt,expected,outcome,response_time,prompt_size,original_line,metadata\n")
+                f.write("prompt,expected,outcome,scanners,response_time,prompt_size,original_line,metadata\n")
             return
         
         with open(file_path, 'w', newline='', encoding='utf-8') as f:
-            fieldnames = ['prompt', 'expected', 'outcome', 'response_time', 'prompt_size', 'original_line', 'metadata']
+            fieldnames = ['prompt', 'expected', 'outcome', 'scanners', 'response_time', 'prompt_size', 'original_line', 'metadata']
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             
@@ -136,6 +276,7 @@ def write_results_to_file(data, file_path, format_type):
                     'prompt': record.get('prompt', ''),
                     'expected': record.get('expected', ''),
                     'outcome': record.get('outcome', ''),
+                    'scanners': _format_scanners(record.get('scanners')),
                     'response_time': record.get('response_time', ''),
                     'prompt_size': record.get('prompt_size', ''),
                     'original_line': record.get('original_line', ''),
@@ -147,12 +288,12 @@ def write_results_to_file(data, file_path, format_type):
         # Write as TSV
         if not data:
             with open(file_path, 'w') as f:
-                f.write("prompt\texpected\toutcome\tresponse_time\tprompt_size\toriginal_line\tmetadata\n")
+                f.write("prompt\texpected\toutcome\tscanners\tresponse_time\tprompt_size\toriginal_line\tmetadata\n")
             return
         
         with open(file_path, 'w', newline='', encoding='utf-8') as f:
             # Write header
-            f.write("prompt\texpected\toutcome\tresponse_time\tprompt_size\toriginal_line\tmetadata\n")
+            f.write("prompt\texpected\toutcome\tscanners\tresponse_time\tprompt_size\toriginal_line\tmetadata\n")
             
             for record in data:
                 # Escape tabs in data
@@ -164,6 +305,7 @@ def write_results_to_file(data, file_path, format_type):
                 f.write(f"{escape_tsv(record.get('prompt', ''))}\t")
                 f.write(f"{escape_tsv(record.get('expected', ''))}\t")
                 f.write(f"{escape_tsv(record.get('outcome', ''))}\t")
+                f.write(f"{escape_tsv(_format_scanners(record.get('scanners')))}\t")
                 f.write(f"{escape_tsv(record.get('response_time', ''))}\t")
                 f.write(f"{escape_tsv(record.get('prompt_size', ''))}\t")
                 f.write(f"{escape_tsv(record.get('original_line', ''))}\t")
@@ -223,6 +365,8 @@ class ScanPromptsNode(BatchNode):
         self.response_times = []
         self.prompt_sizes = []
         self.start_time = None
+        # Resolved once in prep() so the lookup cost is paid per run, not per prompt.
+        self.scanner_map = {}
     
     def prep(self, shared):
         dataset = shared["dataset"]
@@ -231,7 +375,14 @@ class ScanPromptsNode(BatchNode):
         if self.total_prompts == 0:
             print("\nNo prompts to scan. The dataset is empty.")
             return []
-            
+
+        # Resolve scanner IDs to names once up front. Opt-out avoids the extra
+        # requests when only pass/fail outcomes are needed.
+        if shared.get("resolve_scanner_names", True):
+            self.scanner_map = fetch_scanner_map()
+        else:
+            self.scanner_map = {}
+
         print(f"\nStarting scan of {self.total_prompts} prompts...")
         self.start_time = time.time()
         return dataset
@@ -239,9 +390,10 @@ class ScanPromptsNode(BatchNode):
     def exec(self, item):
         prompt = item["prompt"]
         try:
-            result = calypsoai_scan(prompt)
+            result = calypsoai_scan(prompt, self.scanner_map)
             outcome = result['outcome']
             response_time = result['response_time']
+            scanners = result['scanners']
             
             # Calculate prompt size (in characters)
             prompt_size = len(prompt)
@@ -260,6 +412,7 @@ class ScanPromptsNode(BatchNode):
                 "prompt": prompt,
                 "expected": item["expected"],
                 "outcome": outcome,
+                "scanners": scanners,
                 "response_time": response_time,
                 "prompt_size": prompt_size,
                 "original_line": item["original_line"]
@@ -275,6 +428,7 @@ class ScanPromptsNode(BatchNode):
                 "prompt": prompt,
                 "expected": item["expected"],
                 "outcome": f"error: {str(e)}",
+                "scanners": [],
                 "response_time": None,
                 "prompt_size": len(prompt),
                 "original_line": item["original_line"]
@@ -472,6 +626,7 @@ class ExportFalsePositivesNode(Node):
                     "prompt": result['prompt'],
                     "expected": result['expected'],
                     "outcome": result['outcome'],
+                    "scanners": result.get('scanners', []),
                     "response_time": result.get('response_time'),
                     "prompt_size": result.get('prompt_size'),
                     "original_line": result.get('original_line', ''),
@@ -550,6 +705,7 @@ class ExportFalseNegativesNode(Node):
                     "prompt": result['prompt'],
                     "expected": result['expected'],
                     "outcome": result['outcome'],
+                    "scanners": result.get('scanners', []),
                     "response_time": result.get('response_time'),
                     "prompt_size": result.get('prompt_size'),
                     "original_line": result.get('original_line', ''),
@@ -840,6 +996,9 @@ def main():
     parser.add_argument('--results-format', '-r', type=str, default='json',
                       choices=['json', 'csv', 'tsv', 'parquet'],
                       help='Output format for main results file (default: json/jsonl)')
+    parser.add_argument('--no-scanner-names', action='store_true',
+                      help='Skip the scanner ID to name lookup and report raw '
+                           'scanner IDs instead (saves a few startup requests)')
     
     args = parser.parse_args()
     
@@ -852,7 +1011,8 @@ def main():
         "max_lines": args.lines,
         "output_file": args.output,
         "output_format": args.format,
-        "results_format": args.results_format
+        "results_format": args.results_format,
+        "resolve_scanner_names": not args.no_scanner_names
     }
     
     try:
