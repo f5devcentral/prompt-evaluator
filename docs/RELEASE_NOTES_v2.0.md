@@ -1,5 +1,7 @@
 # Release Notes - Prompt Evaluator v2.0
 
+> Historical release record: the commands, defaults, and roadmap below describe the v2.0 release and are not maintained instructions or guarantees of current behavior. Use the current [installation](installation.md), [usage](usage.md), and [dataset](datasets.md) guides.
+
 **Release Date**: October 2025 
 **Version**: 2.0.0  
 **Type**: Major Release
@@ -321,7 +323,7 @@ python tools/improved_dataset_converter.py input.csv output.jsonl
 - **Documentation**: Check `docs/` directory for comprehensive guides
 - **Examples**: Use `tools/demo_improved_formats.py` for demonstrations
 - **Migration**: Use `tools/migrate_datasets.py --help` for migration options
-- **Issues**: Report issues on GitLab with detailed information
+- **Issues**: Report issues on GitHub with detailed information
 
 ### Common Issues
 1. **Migration Problems**: Use `--validate` flag to check conversions
@@ -350,4 +352,4 @@ This major release represents a significant step forward in dataset handling and
 
 **Full Changelog**: See individual commit messages for detailed changes  
 **Documentation**: Visit `docs/` directory for comprehensive guides  
-**Support**: Open an issue on GitLab for questions or problems
+**Support**: Open an issue on GitHub for questions or problems

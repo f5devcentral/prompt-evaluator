@@ -1,6 +1,6 @@
 # Makefile for Prompt Evaluator - Simplified Core Testing
 
-.PHONY: help install install-test test test-core test-simple test-converter test-reader test-integration lint format type-check security clean setup-dev run-concurrent test-concurrent
+.PHONY: help install install-test test test-core test-simple test-converter test-reader test-integration test-contract lint format type-check security clean setup-dev run-concurrent test-concurrent
 
 # Default target
 help:
@@ -18,14 +18,15 @@ help:
 	@echo "  test-converter   Run dataset converter tests only"
 	@echo "  test-reader      Run enhanced reader tests only"
 	@echo "  test-integration Run integration tests only"
-	@echo "  test-concurrent  Test concurrent evaluator with small dataset"
+	@echo "  test-contract    Run offline OpenAPI/workflow contracts with scoped coverage"
+	@echo "  test-concurrent  Run a live concurrent sample (makes API calls)"
 	@echo ""
 	@echo "Concurrent Evaluation:"
 	@echo "  run-concurrent   Run concurrent evaluation (requires dataset path)"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint             Run linting checks"
-	@echo "  format           Format code with black"
+	@echo "  format           Check formatting with black"
 	@echo "  type-check       Run type checking with mypy"
 	@echo "  security         Run security scans"
 	@echo ""
@@ -45,7 +46,7 @@ setup-dev: install-test
 	@echo "Setting up development environment..."
 	@echo "Creating .env file if it doesn't exist..."
 	@if [ ! -f .env ]; then \
-		echo "CALYPSOAI_URL=https://calypsoai.app" > .env; \
+		echo "CALYPSOAI_URL=https://us1.calypsoai.app" > .env; \
 		echo "CALYPSOAI_TOKEN=your_api_token_here" >> .env; \
 		echo "Created .env file with template values"; \
 	fi
@@ -69,6 +70,9 @@ test-reader:
 
 test-integration:
 	python tests/test_runner_simple.py --integration
+
+test-contract:
+	python tests/test_runner_simple.py --contract
 
 # Legacy test commands (kept for compatibility)
 test-unit:
@@ -125,12 +129,12 @@ validate:
 pre-commit: lint format type-check test-core
 	@echo "Pre-commit checks completed!"
 
-# GitLab CI/CD simulation
+# Full CI simulation
 ci-test: install-test lint format type-check test-core security
-	@echo "GitLab CI/CD simulation completed!"
+	@echo "CI simulation completed!"
 
 # GitHub Actions CI simulation
-ci-github: install-test test-simple test-converter test-reader test-integration
+ci-github: install-test test-simple test-converter test-reader test-integration test-contract
 	@echo "Running feature tests..."
 	python test_ci_features.py
 	@echo "Running lint checks..."

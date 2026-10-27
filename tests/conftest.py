@@ -98,15 +98,8 @@ def test_datasets_dir(temp_dir):
 
 @pytest.fixture
 def mock_calypsoai_response():
-    """Mock CalypsoAI API response for testing."""
-    return {
-        "flagged": True,
-        "confidence": 0.95,
-        "response_time": 0.123,
-        "scanner_results": {
-            "prompt_injection": {"flagged": True, "confidence": 0.95}
-        }
-    }
+    """Return a synthetic response using the real nested API envelope."""
+    return {"result": {"outcome": "flagged", "scannerResults": []}, "redactedInput": "synthetic"}
 
 
 @pytest.fixture
@@ -152,9 +145,28 @@ def mock_huggingface_dataset():
 # Test markers for different test categories
 def pytest_configure(config):
     """Configure pytest markers."""
+    # Install guards before collection/imports, not merely before each test.
+    import dotenv
+    import requests
+    import socket
+    config._offline_guard = pytest.MonkeyPatch()
+    config._offline_guard.setattr(dotenv, "load_dotenv", lambda *a, **kw: False)
+
+    def deny_network(*args, **kwargs):
+        """Reject accidental HTTP/socket access; tests explicitly mock their transport."""
+        raise AssertionError("Network disabled in offline tests")
+
+    config._offline_guard.setattr(requests.sessions.Session, "request", deny_network)
+    config._offline_guard.setattr(socket.socket, "connect", deny_network)
     config.addinivalue_line("markers", "unit: Unit tests")
     config.addinivalue_line("markers", "integration: Integration tests")
     config.addinivalue_line("markers", "slow: Slow running tests")
     config.addinivalue_line("markers", "api: Tests that require API access")
     config.addinivalue_line("markers", "format: Tests for dataset format handling")
     config.addinivalue_line("markers", "migration: Tests for dataset migration")
+
+
+def pytest_unconfigure(config):
+    """Restore session-level guards without leaking monkeypatches to another pytest run."""
+    if hasattr(config, "_offline_guard"):
+        config._offline_guard.undo()

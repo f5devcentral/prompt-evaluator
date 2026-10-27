@@ -1,0 +1,2 @@
+# PDF documents are binary assets, not whitespace-checkable text.
+*.pdf binary

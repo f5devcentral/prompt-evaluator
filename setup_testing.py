@@ -46,8 +46,8 @@ def check_python_version():
     """Check if Python version is compatible."""
     print("🐍 Checking Python version...")
     version = sys.version_info
-    if version.major != 3 or version.minor < 8:
-        print(f"   ❌ Python {version.major}.{version.minor} is not supported. Please use Python 3.8+")
+    if version.major != 3 or version.minor < 11:
+        print(f"   ❌ Python {version.major}.{version.minor} is not supported. Please use Python 3.11+")
         return False
     print(f"   ✅ Python {version.major}.{version.minor}.{version.micro} is compatible")
     return True
@@ -55,6 +55,9 @@ def check_python_version():
 
 def install_dependencies():
     """Install required dependencies."""
+    if not os.environ.get("CONDA_PREFIX") or os.environ.get("CONDA_DEFAULT_ENV") == "base":
+        print("Activate the project's Conda environment before installing dependencies.")
+        return False
     print("📦 Installing dependencies...")
     
     # Install production dependencies
@@ -79,7 +82,7 @@ def create_test_environment():
     if not env_file.exists():
         print("   Creating .env file...")
         with open(env_file, 'w') as f:
-            f.write("CALYPSOAI_URL=https://calypsoai.app\n")
+            f.write("CALYPSOAI_URL=https://us1.calypsoai.app\n")
             f.write("CALYPSOAI_TOKEN=your_api_token_here\n")
         print("   ✅ Created .env file with template values")
     else:
@@ -164,7 +167,8 @@ def validate_setup():
         "tests/conftest.py",
         "tests/test_dataset_converter.py",
         "tests/test_enhanced_reader.py",
-        "tests/test_migration_tools.py",
+        "tests/test_api_contract.py",
+        "tests/test_evaluation_contract.py",
         "tests/test_integration.py"
     ]
     
@@ -230,11 +234,11 @@ def main():
     if success:
         print("🎉 Testing environment setup completed successfully!")
         print("\nNext steps:")
-        print("1. Run all tests: make test")
+        print("1. Run curated offline suites: make test-core")
         print("2. Run specific tests: make test-unit")
         print("3. Generate coverage: make test-coverage")
         print("4. Run CI simulation: make ci-test")
-        print("\nFor more information, see TESTING_GUIDE.md")
+        print("\nFor more information, see docs/TESTING_GUIDE_SIMPLE.md")
     else:
         print("❌ Setup encountered issues. Please check the errors above.")
         return 1

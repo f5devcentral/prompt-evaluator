@@ -24,148 +24,38 @@ to simulate real-world multi-user scenarios. It provides enhanced metrics for:
 - Comparison with sequential baseline
 """
 
+
+
+
+
+
+
+
+
+# Node to load the dataset
 import os
-import csv
-import json
 import requests
 import time
 import argparse
 from datetime import datetime
-from urllib.parse import urljoin
-from dotenv import load_dotenv
-from pocketflow import Node, BatchNode, Flow
+from pocketflow import Node, Flow
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 import numpy as np
+from calypsoai_client import send_request
+from evaluation_common import record_category
+from evaluation_common import add_api_arguments, calculate_metrics, error_result, false_results, format_metrics, request_options, result_path, sample_record, write_results_to_file, dataset_inputs, load_dataset_inputs
 
-# Load environment variables
-load_dotenv()
-load_dotenv(override=True)
-
-# Set up API variables
-base_url = urljoin(os.environ.get("CALYPSOAI_URL", "https://www.us1.calypsoai.app"), "/backend/v1")
-
-# Get the API key from environment
-try:
-    api_key = os.environ["CALYPSOAI_TOKEN"]
-except KeyError:
-    api_key = os.getenv("CALYPSOAI_TOKEN")
-    if not api_key:
-        raise ValueError("CALYPSOAI_TOKEN environment variable not found")
-
-# Import the enhanced dataset reader
-from tools.enhanced_dataset_reader import load_dataset_enhanced
-
-
-def write_results_to_file(data, file_path, format_type):
-    """Write results to file in the specified format."""
-    import os
-    
-    # Ensure directory exists
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    
-    if format_type == 'json':
-        # Write as JSONL
-        with open(file_path, 'w') as f:
-            for record in data:
-                json.dump(record, f, ensure_ascii=False)
-                f.write('\n')
-    
-    elif format_type == 'csv':
-        # Write as CSV
-        if not data:
-            with open(file_path, 'w') as f:
-                f.write("prompt,expected,outcome,response_time,prompt_size,original_line,metadata,queue_time_ms,request_time_ms,total_time_ms,worker_id,timestamp\n")
-            return
-        
-        with open(file_path, 'w', newline='', encoding='utf-8') as f:
-            fieldnames = ['prompt', 'expected', 'outcome', 'response_time', 'prompt_size', 'original_line', 
-                         'metadata', 'queue_time_ms', 'request_time_ms', 'total_time_ms', 'worker_id', 'timestamp']
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            for record in data:
-                csv_record = {
-                    'prompt': record.get('prompt', ''),
-                    'expected': record.get('expected', ''),
-                    'outcome': record.get('outcome', ''),
-                    'response_time': record.get('response_time', ''),
-                    'prompt_size': record.get('prompt_size', ''),
-                    'original_line': record.get('original_line', ''),
-                    'metadata': json.dumps(record.get('metadata', {})),
-                    'queue_time_ms': record.get('queue_time_ms', ''),
-                    'request_time_ms': record.get('request_time_ms', ''),
-                    'total_time_ms': record.get('total_time_ms', ''),
-                    'worker_id': record.get('worker_id', ''),
-                    'timestamp': record.get('timestamp', '')
-                }
-                writer.writerow(csv_record)
-    
-    elif format_type == 'tsv':
-        # Write as TSV
-        if not data:
-            with open(file_path, 'w') as f:
-                f.write("prompt\texpected\toutcome\tresponse_time\tprompt_size\toriginal_line\tmetadata\tqueue_time_ms\trequest_time_ms\ttotal_time_ms\tworker_id\ttimestamp\n")
-            return
-        
-        with open(file_path, 'w', newline='', encoding='utf-8') as f:
-            f.write("prompt\texpected\toutcome\tresponse_time\tprompt_size\toriginal_line\tmetadata\tqueue_time_ms\trequest_time_ms\ttotal_time_ms\tworker_id\ttimestamp\n")
-            
-            for record in data:
-                def escape_tsv(value):
-                    if value is None:
-                        return ''
-                    return str(value).replace('\t', '\\t').replace('\n', '\\n').replace('\r', '\\r')
-                
-                f.write(f"{escape_tsv(record.get('prompt', ''))}\t")
-                f.write(f"{escape_tsv(record.get('expected', ''))}\t")
-                f.write(f"{escape_tsv(record.get('outcome', ''))}\t")
-                f.write(f"{escape_tsv(record.get('response_time', ''))}\t")
-                f.write(f"{escape_tsv(record.get('prompt_size', ''))}\t")
-                f.write(f"{escape_tsv(record.get('original_line', ''))}\t")
-                f.write(f"{escape_tsv(json.dumps(record.get('metadata', {})))}\t")
-                f.write(f"{escape_tsv(record.get('queue_time_ms', ''))}\t")
-                f.write(f"{escape_tsv(record.get('request_time_ms', ''))}\t")
-                f.write(f"{escape_tsv(record.get('total_time_ms', ''))}\t")
-                f.write(f"{escape_tsv(record.get('worker_id', ''))}\t")
-                f.write(f"{escape_tsv(record.get('timestamp', ''))}\n")
-    
-    elif format_type == 'parquet':
-        # Write as Parquet
-        try:
-            import pandas as pd
-            df = pd.DataFrame(data)
-            df.to_parquet(file_path, index=False)
-        except ImportError:
-            print("Warning: pandas not available for parquet export. Falling back to JSON.")
-            write_results_to_file(data, file_path.replace('.parquet', '.jsonl'), 'json')
-
-
-# Node to load the dataset
 class LoadDatasetNode(Node):
     """Loads the prompt injection dataset from various file formats."""
     
     def prep(self, shared):
-        input_file = shared.get("input_file", "prompt_inject_dataset.csv")
-        max_lines = shared.get("max_lines", None)
-        format_hint = shared.get("format_hint", None)
-        return input_file, max_lines, format_hint
+        """Preflight input/output paths before any API or output side effects."""
+        return dataset_inputs(shared, "json", "_concurrent")
     
     def exec(self, inputs):
-        input_file, max_lines, format_hint = inputs
-        
-        try:
-            dataset = load_dataset_enhanced(input_file, max_lines, format_hint)
-            print(f"Loaded {len(dataset)} lines from {input_file}")
-            return dataset
-        except FileNotFoundError:
-            error_msg = f"Error: Input file '{input_file}' not found. Please check the file path and try again."
-            print(error_msg)
-            return []
-        except Exception as e:
-            error_msg = f"Error reading file '{input_file}': {str(e)}"
-            print(error_msg)
-            return []
+        """Fail unreadable/empty inputs before the save/export workflow can run."""
+        return load_dataset_inputs(inputs)
     
     def post(self, shared, prep_res, exec_res):
         shared["dataset"] = exec_res
@@ -177,142 +67,90 @@ class ConcurrentScanPromptsNode(Node):
     """Scans multiple prompts concurrently using ThreadPoolExecutor."""
     
     def __init__(self, concurrency=10, rate_limit=None):
+        """Create bounded workers; invalid concurrency/rates fail before requests."""
         super().__init__()
+        import math
+        from threading import local
+        if type(concurrency) is not int or concurrency <= 0:
+            raise ValueError("Concurrency must be a positive integer")
+        if rate_limit is not None and (not math.isfinite(rate_limit) or rate_limit <= 0):
+            raise ValueError("Rate limit must be finite and positive")
         self.concurrency = concurrency
         self.rate_limit = rate_limit
         self.progress_lock = Lock()
         self.completed = 0
         self.total = 0
         self.start_time = None
-        
-        # Configure session with connection pooling
-        self.session = requests.Session()
-        adapter = requests.adapters.HTTPAdapter(
-            pool_connections=concurrency,
-            pool_maxsize=concurrency * 2,
-            max_retries=3
-        )
-        self.session.mount('https://', adapter)
-        self.session.mount('http://', adapter)
-    
-    def scan_prompt_with_timing(self, item, worker_id):
-        """Scan a single prompt and track timing metrics."""
-        prompt = item["prompt"]
-        
-        # Record when this request starts
-        submit_time = time.time()
-        queue_start = submit_time - self.start_time
-        
+        self._local = local()
+        self._sessions = []
+        self._options = {}
+
+    @property
+    def session(self):
+        """Use one connection pool per thread; never replay non-idempotent POSTs."""
+        if not hasattr(self._local, "session"):
+            session = requests.Session()
+            adapter = requests.adapters.HTTPAdapter(max_retries=0)
+            session.mount("https://", adapter)
+            session.mount("http://", adapter)
+            self._local.session = session
+            with self.progress_lock:
+                self._local.worker_id = len(self._sessions)
+                self._sessions.append(session)
+        return self._local.session
+
+    def scan_prompt_with_timing(self, item, worker_id, submitted_at=None):
+        """Measure executor wait from submission, retaining row provenance on failure."""
+        started = time.perf_counter()
+        request_timestamp = datetime.now().astimezone().isoformat()
+        submitted_at = started if submitted_at is None else submitted_at
         try:
-            # Record start of actual API request
-            request_start = time.time()
-            
-            headers = {
-                'Authorization': f'Bearer {api_key}',
-                'Content-Type': 'application/json',
-            }
-            payload = {"input": prompt}
-            url = f"{base_url}/scans"
-            
-            response = self.session.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            
-            # Calculate timing
-            request_time = time.time() - request_start
-            total_time = time.time() - submit_time
-            queue_time = request_start - submit_time
-            
-            outcome = response.json()
-            
-            # Handle the API response format
-            if 'result' in outcome and 'outcome' in outcome['result']:
-                result_outcome = outcome['result']['outcome']
-            else:
-                result_outcome = outcome.get('result', {}).get('outcome', 'no_result')
-            
-            # Update progress
-            with self.progress_lock:
-                self.completed += 1
-                if self.completed % 10 == 0 or self.completed == self.total:
-                    elapsed = time.time() - self.start_time
-                    throughput = self.completed / elapsed if elapsed > 0 else 0
-                    print(f"Progress: {self.completed}/{self.total} ({self.completed/self.total*100:.1f}%) - Throughput: {throughput:.2f} prompts/sec")
-            
-            return {
-                "prompt": prompt,
-                "expected": item["expected"],
-                "outcome": result_outcome,
-                "response_time": request_time,
-                "prompt_size": len(prompt),
-                "original_line": item["original_line"],
-                "queue_time_ms": queue_time * 1000,
-                "request_time_ms": request_time * 1000,
-                "total_time_ms": total_time * 1000,
-                "worker_id": worker_id,
-                "timestamp": datetime.fromtimestamp(request_start).isoformat()
-            }
-        except Exception as e:
-            # Update progress even on error
-            with self.progress_lock:
-                self.completed += 1
-                if self.completed % 10 == 0 or self.completed == self.total:
-                    print(f"Progress: {self.completed}/{self.total} ({self.completed/self.total*100:.1f}%)")
-            
-            return {
-                "prompt": prompt,
-                "expected": item["expected"],
-                "outcome": f"error: {str(e)}",
-                "response_time": None,
-                "prompt_size": len(prompt),
-                "original_line": item["original_line"],
-                "queue_time_ms": None,
-                "request_time_ms": None,
-                "total_time_ms": None,
-                "worker_id": worker_id,
-                "timestamp": datetime.now().isoformat()
-            }
+            result = send_request("scans", item["prompt"], session=self.session, **self._options)
+            row = sample_record(item, result)
+        except Exception as error:
+            row = error_result(item, error)
+        row.update({
+            "queue_time_ms": (started - submitted_at) * 1000,
+            "request_time_ms": row["response_time"] * 1000 if row["response_time"] is not None else None,
+            "total_time_ms": (time.perf_counter() - submitted_at) * 1000,
+            "worker_id": getattr(self._local, "worker_id", worker_id),
+            "request_timestamp": request_timestamp,
+        })
+        with self.progress_lock:
+            self.completed += 1
+            if self.completed % 10 == 0 or self.completed == self.total:
+                print(f"Progress: {self.completed}/{self.total} prompts processed")
+        return row
     
     def prep(self, shared):
         dataset = shared["dataset"]
         self.total = len(dataset)
-        
-        if self.total == 0:
-            print("\nNo prompts to scan. The dataset is empty.")
-            return []
-        
-        print(f"\nStarting concurrent scan of {self.total} prompts with {self.concurrency} workers...")
+        self.completed = 0
+        self._options = request_options(shared) if dataset else {}
         return dataset
     
     def exec(self, dataset):
+        """Collect out-of-order results and close every worker-local session."""
         if not dataset:
             return []
-        
-        results = []
         self.start_time = time.time()
-        worker_counter = 0
-        
-        with ThreadPoolExecutor(max_workers=self.concurrency) as executor:
-            # Submit all tasks
-            future_to_item = {}
-            for item in dataset:
-                worker_id = worker_counter % self.concurrency
-                future = executor.submit(self.scan_prompt_with_timing, item, worker_id)
-                future_to_item[future] = item
-                worker_counter += 1
-                
-                # Rate limiting if specified
-                if self.rate_limit:
-                    time.sleep(1.0 / self.rate_limit)
-            
-            # Collect results as they complete
-            for future in as_completed(future_to_item):
-                result = future.result()
-                results.append(result)
-        
-        total_elapsed = time.time() - self.start_time
-        print(f"\nCompleted scanning {len(results)} prompts in {total_elapsed:.2f} seconds")
-        print(f"Overall throughput: {len(results)/total_elapsed:.2f} prompts/sec")
-        
+        results = []
+        try:
+            with ThreadPoolExecutor(max_workers=self.concurrency) as executor:
+                futures = []
+                for index, item in enumerate(dataset):
+                    submitted_at = time.perf_counter()
+                    futures.append(executor.submit(
+                        self.scan_prompt_with_timing, item, index % self.concurrency, submitted_at
+                    ))
+                    if self.rate_limit:
+                        time.sleep(1.0 / self.rate_limit)
+                for future in as_completed(futures):
+                    results.append(future.result())
+        finally:
+            for session in self._sessions:
+                session.close()
+            self._sessions.clear()
         return results
     
     def post(self, shared, prep_res, exec_res):
@@ -330,40 +168,16 @@ class SaveResultsNode(Node):
     """Saves the scan results to a file in the results folder."""
     
     def prep(self, shared):
-        input_file = shared.get("input_file", "prompt_inject_dataset.csv")
-        output_file = shared.get("output_file", "scanned_output.csv")
-        results_format = shared.get("results_format", "json")
-        
-        # Create results directory
-        results_dir = "results"
-        os.makedirs(results_dir, exist_ok=True)
-        
-        # Extract dataset name from input file
-        dataset_name = os.path.splitext(os.path.basename(input_file))[0]
-        
-        # Determine file extension based on format
-        extension_map = {
-            'json': 'jsonl',
-            'csv': 'csv',
-            'tsv': 'tsv',
-            'parquet': 'parquet'
-        }
-        extension = extension_map.get(results_format, 'jsonl')
-        
-        # Create main results filename with _concurrent suffix
-        main_results_file = os.path.join(results_dir, f"{dataset_name}_concurrent_results.{extension}")
-        return main_results_file, shared["scan_results"], results_format
+        """Resolve the selected format and an output confined to results/."""
+        format_type = shared.get("results_format", "json")
+        path = result_path(shared["input_file"], format_type,
+                           shared.get("output_file"), suffix="_concurrent")
+        return path, shared.get("scan_results", []), format_type
     
     def exec(self, inputs):
-        output_file, scan_results, results_format = inputs
-        
-        if not scan_results:
-            print(f"No results to save to {output_file}.")
-            write_results_to_file([], output_file, results_format)
-            return output_file
-        
-        write_results_to_file(scan_results, output_file, results_format)
-        return output_file
+        """Serialize all fields, preserving nested evidence in tabular formats."""
+        output_file, rows, format_type = inputs
+        return write_results_to_file(rows, output_file, format_type)
     
     def post(self, shared, prep_res, exec_res):
         shared["output_file"] = exec_res
@@ -378,57 +192,8 @@ class EvaluateAccuracyNode(Node):
         return shared["scan_results"]
     
     def exec(self, scan_results):
-        if not scan_results:
-            print("No results to evaluate.")
-            return {
-                "true_positive": 0,
-                "true_negative": 0,
-                "false_positive": 0,
-                "false_negative": 0,
-                "total": 0,
-                "accuracy": 0,
-                "precision": 0,
-                "recall": 0,
-                "f1_score": 0
-            }
-        
-        # Initialize counters
-        true_positive = 0
-        true_negative = 0
-        false_positive = 0
-        false_negative = 0
-        
-        for result in scan_results:
-            expected = result["expected"]
-            outcome = result["outcome"].lower()
-            
-            if expected == 'true' and outcome == 'flagged':
-                true_positive += 1
-            elif expected == 'false' and outcome == 'cleared':
-                true_negative += 1
-            elif expected == 'false' and outcome == 'flagged':
-                false_positive += 1
-            elif expected == 'true' and outcome == 'cleared':
-                false_negative += 1
-        
-        # Calculate metrics
-        total = true_positive + true_negative + false_positive + false_negative
-        accuracy = (true_positive + true_negative) / total if total > 0 else 0
-        precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) > 0 else 0
-        recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) > 0 else 0
-        f1_score = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
-        
-        return {
-            "true_positive": true_positive,
-            "true_negative": true_negative,
-            "false_positive": false_positive,
-            "false_negative": false_negative,
-            "total": total,
-            "accuracy": accuracy,
-            "precision": precision,
-            "recall": recall,
-            "f1_score": f1_score
-        }
+        """Score rows using the shared detection and exclusion policy."""
+        return calculate_metrics(scan_results)
     
     def post(self, shared, prep_res, exec_res):
         shared["evaluation_results"] = exec_res
@@ -450,10 +215,11 @@ class ConcurrentMetricsNode(Node):
         if not scan_results:
             return "No results to analyze."
         
-        # Extract timing data
-        request_times = [r.get('request_time_ms') for r in scan_results if r.get('request_time_ms') is not None]
-        queue_times = [r.get('queue_time_ms') for r in scan_results if r.get('queue_time_ms') is not None]
-        total_times = [r.get('total_time_ms') for r in scan_results if r.get('total_time_ms') is not None]
+        # Match sequential/PDF latency membership; throughput still counts attempts.
+        timed_results = [r for r in scan_results if record_category(r) in ("tp", "tn", "fp", "fn")]
+        request_times = [r.get('request_time_ms') for r in timed_results if r.get('request_time_ms') is not None]
+        queue_times = [r.get('queue_time_ms') for r in timed_results if r.get('queue_time_ms') is not None]
+        total_times = [r.get('total_time_ms') for r in timed_results if r.get('total_time_ms') is not None]
         
         if not request_times:
             return "No valid timing data available."
@@ -498,9 +264,9 @@ Total Elapsed Time: {total_time:.2f} seconds
 
 Throughput:
 -----------
-Overall: {throughput:.2f} prompts/sec
+Attempt throughput: {throughput:.2f} prompts/sec
 
-Request Latency (API call time):
+Request Latency (evaluable rows):
 --------------------------------
 Average: {req_avg:.2f} ms
 Minimum: {req_min:.2f} ms
@@ -578,28 +344,12 @@ class ExportFalseResultsNode(Node):
         return scan_results, fp_file, fn_file, output_format
     
     def exec(self, inputs):
-        scan_results, fp_file, fn_file, output_format = inputs
-        
-        if not scan_results:
-            return fp_file, fn_file, 0, 0
-        
-        false_positives = []
-        false_negatives = []
-        
-        for result in scan_results:
-            expected = result.get("expected", "").lower()
-            outcome = result.get("outcome", "").lower()
-            
-            if expected == 'false' and outcome == 'flagged':
-                false_positives.append(result)
-            elif expected == 'true' and outcome == 'cleared':
-                false_negatives.append(result)
-        
-        # Write files
-        write_results_to_file(false_positives, fp_file, output_format)
-        write_results_to_file(false_negatives, fn_file, output_format)
-        
-        return fp_file, fn_file, len(false_positives), len(false_negatives)
+        """Keep exports and metric membership consistent for every outcome."""
+        records, fp_file, fn_file, format_type = inputs
+        fps, fns = false_results(records)
+        write_results_to_file(fps, fp_file, format_type)
+        write_results_to_file(fns, fn_file, format_type)
+        return fp_file, fn_file, len(fps), len(fns)
     
     def post(self, shared, prep_res, exec_res):
         fp_file, fn_file, fp_count, fn_count = exec_res
@@ -620,23 +370,8 @@ class DisplayResultsNode(Node):
         return shared["evaluation_results"]
     
     def exec(self, results):
-        if results['total'] == 0:
-            return "\nEvaluation Results:\n------------------\nNo data was processed. No results to display."
-        
-        output = f"""
-Evaluation Results:
-------------------
-True Positives: {results['true_positive']}
-True Negatives: {results['true_negative']}
-False Positives: {results['false_positive']}
-False Negatives: {results['false_negative']}
-Total Samples: {results['total']}
-Overall Accuracy: {results['accuracy']:.2%}
-Precision: {results['precision']:.2%}
-Recall: {results['recall']:.2%}
-F1 Score: {results['f1_score']:.2%}
-"""
-        return output
+        """Display attempted/evaluated counts, including all-error runs."""
+        return format_metrics(results)
     
     def post(self, shared, prep_res, exec_res):
         print(exec_res)
@@ -694,6 +429,8 @@ Examples:
                       choices=['json', 'csv', 'tsv', 'parquet'],
                       help='Output format for main results file (default: json/jsonl)')
     
+    parser.add_argument("--output", "-o", default=None, help="Output filename within results/")
+    add_api_arguments(parser, prompts=False)
     args = parser.parse_args()
     
     # Display infrastructure impact warning
@@ -755,7 +492,10 @@ Examples:
         "results_format": args.results_format
     }
     
+    shared.update(vars(args))
+    shared["output_file"] = args.output
     try:
+        result_path(args.input, args.results_format, args.output, suffix="_concurrent")
         flow.run(shared)
         
         if "dataset" in shared and not shared["dataset"]:
@@ -763,12 +503,11 @@ Examples:
             return
         
         print(f"\nResults have been saved to: {shared.get('output_file', 'results/')}")
+        return 2 if shared.get("evaluation_results", {}).get("excluded_count", 0) else 0
     except Exception as e:
         print(f"\nAn error occurred: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

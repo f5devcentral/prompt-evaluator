@@ -52,20 +52,21 @@ def main():
     parser.add_argument("--converter", action="store_true", help="Run dataset converter tests only")
     parser.add_argument("--reader", action="store_true", help="Run enhanced reader tests only")
     parser.add_argument("--integration", action="store_true", help="Run integration tests only")
+    parser.add_argument("--contract", action="store_true", help="Run offline API and evaluation contract tests")
     parser.add_argument("--all", action="store_true", help="Run all core tests")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     
     args = parser.parse_args()
     
     # If no specific tests are requested, run all core tests
-    if not any([args.core, args.converter, args.reader, args.integration]):
+    if not any([args.core, args.converter, args.reader, args.integration, args.contract]):
         args.all = True
     
     success_count = 0
     total_count = 0
     
     # Base pytest command
-    base_cmd = ["python", "-m", "pytest"]
+    base_cmd = [sys.executable, "-m", "pytest"]
     if args.verbose:
         base_cmd.append("-v")
     
@@ -105,6 +106,16 @@ def main():
         if run_command(cmd, "Integration Tests (Working)"):
             success_count += 1
     
+    if args.contract or args.all:
+        total_count += 1
+        cmd = base_cmd + [
+            "tests/test_api_contract.py", "tests/test_evaluation_contract.py",
+            "--cov=calypsoai_client", "--cov=evaluation_common",
+            "--cov-report=term-missing", "--cov-fail-under=80",
+        ]
+        if run_command(cmd, "Offline API and Evaluation Contracts"):
+            success_count += 1
+
     # Summary
     print(f"\n{'='*60}")
     print(f"TEST SUMMARY")

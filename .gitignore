@@ -81,7 +81,8 @@ Thumbs.db
 #!datasets/sample_*.jsonl
 
 # Results and outputs
-results/
+/results/*
+!/results/.gitkeep
 output/
 *.log
 

@@ -1,50 +1,31 @@
-# Documentation Index
+# Documentation
 
-This directory contains comprehensive documentation for the Prompt Evaluator project.
+Start with [installation](installation.md) to prepare your environment, then [usage](usage.md) to run an evaluation. [What's changed](../CHANGES_SUMMARY.md) explains the latest API update and user-visible improvements.
 
-## Core Documentation
+## Run evaluations
 
-- **[Installation Guide](installation.md)** - Detailed setup instructions and requirements
-- **[Usage Guide](usage.md)** - Complete usage examples and command-line options
-- **[Dataset Management](datasets.md)** - Working with datasets and Hugging Face integration
-- **[Evaluation Metrics](evaluation-metrics.md)** - Understanding performance metrics
-- **[PDF Reports](pdf-reports.md)** - Generate professional PDF reports
-- **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
-- **[Contributing](contributing.md)** - How to contribute to the project
+- [Quick reference](CHEAT_SHEET.md): common setup, evaluation, and reporting commands.
+- [Usage](usage.md): project/provider selection, row limits, timeouts, and output controls.
+- [Datasets](datasets.md): included examples, downloading data, and conversion choices.
+- [Concurrent evaluation](CONCURRENT_EVALUATION.md): parallel scans, rate limits, and load-test precautions.
+- [Sequential versus concurrent](SEQUENTIAL_VS_CONCURRENT.md): how to compare results fairly.
 
-## 🆕 New Features
+## Understand and export results
 
-- **[PDF Report Generator](pdf-reports.md)** - Beautiful, professional PDF reports with charts and analysis
-- **[Improved Dataset Formats](IMPROVED_DATASET_FORMATS.md)** - New dataset formats and migration guide
+- [Evaluation metrics](evaluation-metrics.md): outcomes, accuracy, exclusions, and timing.
+- [Result formats](results-format-changes.md): defaults, filenames, and compatibility with older files.
+- [Export examples](example_usage.md): false-positive and false-negative files.
+- [PDF reports](pdf-reports.md): automatic/manual generation and custom result files.
+- [Report features](PDF_REPORT_FEATURES.md): the information each report includes.
+- [Troubleshooting](troubleshooting.md): setup, input, API, and reporting problems.
 
-## Quick Reference
+Results and report examples can contain sensitive data. Review the handling guidance before sharing them.
 
-### Core Tools
-- `prompt_evaluator.py` - Standard CalypsoAI evaluation
-- `prompt_evaluator_prompts.py` - Advanced CalypsoAI with LLM responses
-- `evaluate_existing_results.py` - Calculate metrics from existing results
+## Work with datasets and the project
 
-### 🆕 New Dataset Tools
-- `improved_dataset_converter.py` - Convert between dataset formats
-- `enhanced_dataset_reader.py` - Unified dataset reader
-- `migrate_datasets.py` - Batch migration tool
-- `demo_improved_formats.py` - Complete demonstration
+- [Dataset formats](IMPROVED_DATASET_FORMATS.md) and [dataset tools](../tools/README.md).
+- [Testing](TESTING_GUIDE_SIMPLE.md) and [contributing](contributing.md).
+- [Changelog](../CHANGELOG.md) for development history.
+- [Historical v2.0 release notes](RELEASE_NOTES_v2.0.md), which describe that release rather than today's commands.
 
-### Utility Tools
-- `report_generator.py` - Generate professional PDF reports
-- `download_hf_datasets.py` - Download datasets from Hugging Face
-- `convert_dataset.py` - Legacy dataset converter
-- `validate_setup.py` - Validate your setup
-
-## Getting Started
-
-1. Start with the [Installation Guide](installation.md)
-2. Follow the [Usage Guide](usage.md) for examples
-3. Learn about [Dataset Management](datasets.md) for working with data
-4. Check out [Improved Dataset Formats](IMPROVED_DATASET_FORMATS.md) for the latest features
-
-## Need Help?
-
-- Check [Troubleshooting](troubleshooting.md) for common issues
-- Review the [Contributing Guide](contributing.md) for development
-- Open an issue on GitLab for bugs or feature requests
+[Documentation organization](DOCUMENTATION_ORGANIZATION.md) explains where each topic belongs. [Coverage map](WHATS_DOCUMENTED.md) links supported workflows to their current guides.

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Latest API support and clearer results
+
+- Updated scan and LLM-response workflows to work with the latest CalypsoAI API, including project selection and configured provider selection.
+- Account for flagged, blocked, redacted, and cleared outcomes consistently across evaluation, saved-result analysis, misclassification exports, and PDF reports.
+- Show failed requests, incomplete scans, and invalid rows separately from evaluated samples so accuracy is easier to interpret.
+- Support custom output names and configurable formats for all evaluators. Scan tools retain JSONL defaults; the LLM-response evaluator retains CSV.
+- Correct report charts and rebuild examples from selected results instead of potentially stale export files.
+- Add request timeouts, more accurate parallel-run timing, and checks that reject bad inputs or conflicting output paths before sending data.
+- Make setup checks offline by default, keep detailed diagnostic content opt-in, and exclude generated results from Git except for the empty directory placeholder.
+
+Existing supported datasets/results remain usable without a required migration. Recalculated scores can change because detection outcomes and excluded records are now handled consistently. See [what's changed](CHANGES_SUMMARY.md), [usage](docs/usage.md), and [compatibility notes](docs/results-format-changes.md).
+
+## Earlier development notes
+
+The entries below describe earlier changes. Their historical examples and compatibility statements don't replace the current user guides.
+
 ### Added
 - **Enhanced Performance Metrics in Sequential Evaluator** (2025-12-12)
   - Added throughput calculation (prompts/sec) to sequential evaluator

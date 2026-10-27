@@ -1,60 +1,16 @@
-# False Positives and False Negatives Export Feature
+# Misclassification export examples
 
-This document demonstrates the new export feature that creates separate CSV files for False Positives and False Negatives to help with troubleshooting.
+FP/FN exports use the same binary policy as online evaluation and reports: flagged, blocked, and redacted are detections; cleared is no detection. Request failures, incomplete guardrail executions, and invalid rows are excluded rather than mislabeled FP/FN.
 
-## What's New
+After confirming the tenant and project, these live examples select CSV for main results and exports:
 
-The evaluator now automatically exports two additional CSV files:
-- `{output_file}_false_positives.csv` - Contains prompts that were incorrectly flagged as malicious
-- `{output_file}_false_negatives.csv` - Contains prompts that were incorrectly cleared when they should have been flagged
-
-## Usage Examples
-
-### Basic Usage (prompt_evaluator.py)
 ```bash
-python prompt_evaluator.py --input dataset.csv --output results.csv
+python prompt_evaluator.py --input datasets/sample-datasets/pii_dataset.jsonl --lines 10 --project evaluation-project --results-format csv --format csv --output baseline.csv
+python prompt_evaluator_prompts.py --input datasets/sample-datasets/pii_dataset.jsonl --max-lines 10 --project evaluation-project --provider evaluation-provider --format csv --output pipeline.csv
 ```
 
-This will create:
-- `results.csv` - Main results file
-- `results_false_positives.csv` - False positives for troubleshooting
-- `results_false_negatives.csv` - False negatives for troubleshooting
+Main results are `results/baseline.csv` or `results/pipeline.csv`. FP/FN exports remain dataset-derived: `results/pii_dataset_false_positives.csv` and `results/pii_dataset_false_negatives.csv`. They are standard comma-separated CSV, not pipe-delimited. All exports include available source provenance and safe scanner evidence; nested structures are JSON cells.
 
-### Advanced Usage (prompt_evaluator_prompts.py)
-```bash
-python prompt_evaluator_prompts.py --input dataset.csv --output prompts_results.csv
-```
+Without explicit format flags, scan main results use JSONL, prompts main results use CSV, and FP/FN exports use JSONL in both modes. Concurrent outputs include `_concurrent` in their default names. Archive prior runs before intentionally reusing names.
 
-This will create:
-- `prompts_results.csv` - Main results file with LLM responses
-- `prompts_results_false_positives.csv` - False positives with detailed scanner results
-- `prompts_results_false_negatives.csv` - False negatives with detailed scanner results
-
-## File Format
-
-### False Positives CSV Format
-```
-prompt|expected|outcome|response_time|prompt_size|original_line
-```
-
-### False Negatives CSV Format (prompt_evaluator_prompts.py)
-```
-prompt|expected|outcome|response|response_time|prompt_size|scanner_results|original_line
-```
-
-## Benefits
-
-1. **Focused Analysis**: Quickly identify problematic prompts without filtering through all results
-2. **Troubleshooting**: Understand why certain prompts were misclassified
-3. **Model Improvement**: Use these files to improve training data or adjust thresholds
-4. **Quality Assurance**: Review edge cases that need attention
-
-## Example Output
-
-When you run an evaluation, you'll see output like:
-```
-Exported 15 false positives to results_false_positives.csv
-Exported 8 false negatives to results_false_negatives.csv
-```
-
-This helps you understand the distribution of errors in your evaluation results.
+Reports recompute examples from main results instead of trusting these sidecars. Result files and PDF examples can contain PII; review content and access before sharing. See [usage](usage.md), [formats](results-format-changes.md), and [metrics](evaluation-metrics.md).
