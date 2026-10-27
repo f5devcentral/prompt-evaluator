@@ -1,227 +1,89 @@
-# Improved Dataset Formats
+# Dataset formats
 
-This document explains the improved dataset formats available in the prompt evaluator, addressing the limitations of the original pipe-delimited format.
+JSONL is the recommended starting point for prompts with quotes, separators, newlines, or nested metadata. CSV and TSV work well with spreadsheet tools when fields are properly quoted. Parquet is available when its optional engine is installed. Legacy pipe format remains supported with an explicit hint when needed.
 
-## Problems with the Original Format
+These are input-dataset choices, not a promise that every legacy conversion tool supports every direction or preserves every field. Evaluation result exports have their own [format guide](results-format-changes.md).
 
-The original pipe-delimited format (`"prompt"|expected`) had several issues:
+## JSONL
 
-1. **Manual parsing**: Required custom string splitting and quote stripping
-2. **No escaping**: Long prompts with pipes, quotes, or newlines could break the format
-3. **Inconsistent quoting**: Some datasets used triple quotes `"""`, others used single quotes
-4. **No metadata**: Couldn't store additional information like IDs, timestamps, etc.
-5. **Error-prone**: Manual string manipulation was prone to errors
+Store one JSON object per line:
 
-## New Format Options
-
-### 1. JSON Lines (JSONL) - **Recommended**
-
-**Format**: One JSON object per line
-```json
-{"prompt": "This is a normal prompt", "expected": "false", "id": "sample_1", "metadata": {"source": "example"}}
-{"prompt": "This prompt has commas, quotes \"like this\", and pipes | everywhere", "expected": "true", "id": "sample_2"}
+```jsonl
+{"prompt":"A harmless example","expected":false,"id":"example-1"}
+{"prompt":"A reviewed detection example","expected":true,"metadata":{"source":"example"}}
 ```
 
-**Benefits**:
-- ✅ Handles complex data structures
-- ✅ Preserves metadata and timestamps
-- ✅ No escaping issues with special characters
-- ✅ Easy to parse programmatically
-- ✅ Supports streaming processing
+JSON encoding safely represents tabs, newlines, and quotes inside a prompt. The current reader still collects records into memory; the format's ability to support streaming doesn't mean this application performs bounded-memory streaming.
 
-### 2. CSV with Proper Escaping
+## CSV and TSV
 
-**Format**: Standard CSV with quoted fields
+Include named `prompt` and `expected` columns. Quote values containing separators or newlines using a standard CSV writer.
+
 ```csv
-prompt,expected,id,timestamp
-"This is a normal prompt",false,sample_1,2024-01-01T00:00:00
-"This prompt has ""quotes"" and, commas",true,sample_2,2024-01-01T00:00:00
+prompt,expected
+"A harmless example",false
+"A prompt with a comma, and ""quotes""",true
 ```
 
-**Benefits**:
-- ✅ Standard format, widely supported
-- ✅ Proper escaping with quotes
-- ✅ Works with Excel and other tools
-- ✅ Human-readable
+A simple TSV file uses actual tab characters between fields:
 
-### 3. TSV (Tab-Separated Values)
-
-**Format**: Tab-separated values
 ```tsv
-prompt	expected	id	timestamp
-This is a normal prompt	false	sample_1	2024-01-01T00:00:00
-This prompt has tabs	and	newlines	true	sample_2	2024-01-01T00:00:00
+prompt	expected
+A harmless example	false
+A reviewed detection example	true
 ```
 
-**Benefits**:
-- ✅ Less likely to conflict with data content
-- ✅ Better than pipe-delimited
-- ✅ Easy to parse
-- ✅ Good for data with commas
+Don't insert an unquoted tab inside a TSV field; it creates another column. JSONL is simpler for complex prompts or metadata. Evaluators recognize common text/label aliases, but canonical column names avoid ambiguity.
 
-### 4. Parquet (Binary Format)
+## Parquet and legacy files
 
-**Format**: Binary columnar format
-- Not human-readable
-- Excellent for large datasets
-- Built-in compression
-- Schema evolution support
+Install `requirements-parquet.txt` inside the project Conda environment for Parquet. Evaluation readers support Parquet input and result writers support Parquet output. Large files can still consume substantial memory.
 
-## Usage Examples
-
-### Converting Datasets
+For an old pipe-delimited file named `.csv`, tell the evaluator which format to read:
 
 ```bash
-# Convert a single dataset
-python improved_dataset_converter.py input.csv output.jsonl --output-format jsonl
-
-# Convert with validation
-python improved_dataset_converter.py input.csv output.jsonl --validate
-
-# Auto-detect input format
-python improved_dataset_converter.py input.csv output.jsonl
+python prompt_evaluator.py --input legacy.csv --format-hint pipe --lines 10
 ```
 
-### Migrating All Datasets
+This is a live scan after loading input. Confirm the configured environment before running it. Pipe parsing has limitations when prompt text itself contains pipes; prefer a reviewed conversion to JSONL for new work.
+
+## Inspect locally
 
 ```bash
-# List all datasets and their formats
-python migrate_datasets.py --list
-
-# Migrate all datasets to JSONL format
-python migrate_datasets.py --all --output-format jsonl
-
-# Migrate without creating backups
-python migrate_datasets.py --all --no-backup
+python validate_setup.py --dataset datasets/sample-datasets/pii_dataset.jsonl
+python -m tools.enhanced_dataset_reader datasets/sample-datasets/pii_dataset.jsonl --max-lines 2
 ```
 
-### Using the Enhanced Reader
+The standalone reader prints prompt samples; don't share its output without reviewing it. Its format option is `--format`, while evaluator input hints use `--format-hint`.
+
+For Python callers, the reader returns `PromptRecord` objects, not dictionaries:
 
 ```python
-from enhanced_dataset_reader import EnhancedDatasetReader
+from tools.enhanced_dataset_reader import EnhancedDatasetReader
 
-# Auto-detect format and read
-reader = EnhancedDatasetReader()
-records = reader.read_dataset("my_dataset.jsonl")
-
-# Specify format explicitly
-records = reader.read_dataset("my_dataset.csv", format_hint="csv")
-
-# Limit number of records
-records = reader.read_dataset("my_dataset.jsonl", max_lines=100)
+records = EnhancedDatasetReader().read_dataset("dataset.jsonl", max_lines=20)
+for record in records:
+    print(record.id, record.expected)
 ```
 
-## Migration Guide
+`load_dataset_enhanced()` is the compatibility wrapper used by evaluators when dictionary records are needed.
 
-### Step 1: Analyze Current Datasets
+## Conversion and migration
+
+Use the working root-level converter for straightforward CSV/JSONL normalization:
 
 ```bash
-python migrate_datasets.py --list
+python convert_dataset.py --input source.csv --output datasets/source_converted.jsonl
 ```
 
-This will show you all datasets and their current formats.
+For other formats, use the Python examples in [dataset tools](../tools/README.md). The advanced converter's CLI currently passes its format arguments in the wrong order, so its normal conversion examples are not recommended. Its `--validate` option isn't a standalone one-file validation command. Use `validate_setup.py --dataset` for local evaluator-input checks.
 
-### Step 2: Migrate to Better Format
+The legacy migrator is a package module:
 
 ```bash
-# Migrate all datasets to JSONL (recommended)
-python migrate_datasets.py --all --output-format jsonl
-
-# Or migrate a specific dataset
-python migrate_datasets.py --input datasets/my_dataset.csv --output-format jsonl
+python -m tools.migrate_datasets --list
 ```
 
-### Step 3: Update Your Code
+Listing only inspects direct `datasets/*.csv` files. It doesn't inventory nested JSONL samples. Migration assumes legacy pipe input, and `--all` only processes detected pipe files from that limited inventory. Backups are enabled by default, but existing backup files aren't refreshed automatically, and there is no rollback command. Read [migration precautions](../tools/README.md#legacy-migration) before making copies or conversions.
 
-The prompt evaluator scripts have been updated to automatically detect and read the new formats. No changes needed to your existing code!
-
-## Format Comparison
-
-| Format | Human Readable | Special Chars | Metadata | Size | Performance |
-|--------|----------------|---------------|----------|------|-------------|
-| JSONL | ✅ | ✅ | ✅ | Medium | Fast |
-| CSV | ✅ | ⚠️ | ✅ | Small | Fast |
-| TSV | ✅ | ⚠️ | ✅ | Small | Fast |
-| Pipe | ✅ | ❌ | ❌ | Small | Slow |
-| Parquet | ❌ | ✅ | ✅ | Very Small | Very Fast |
-
-## Best Practices
-
-### For New Datasets
-- **Use JSONL format** for maximum flexibility and robustness
-- Include metadata like source, timestamp, and category
-- Use meaningful IDs for each record
-
-### For Large Datasets
-- Consider **Parquet format** for better performance
-- Use streaming processing for very large files
-- Implement proper error handling
-
-### For Sharing Datasets
-- **CSV format** is most widely supported
-- Include a README with format documentation
-- Provide sample data for testing
-
-## Backward Compatibility
-
-The enhanced dataset reader maintains full backward compatibility:
-
-- ✅ Reads existing pipe-delimited datasets
-- ✅ Works with all existing prompt evaluator scripts
-- ✅ No changes needed to existing code
-- ✅ Gradual migration supported
-
-## Example: Complete Workflow
-
-```bash
-# 1. Analyze your current datasets
-python migrate_datasets.py --list
-
-# 2. Migrate to JSONL format
-python migrate_datasets.py --all --output-format jsonl
-
-# 3. Validate the migration
-python improved_dataset_converter.py datasets/my_dataset.jsonl --validate
-
-# 4. Use with prompt evaluator (no changes needed!)
-python prompt_evaluator.py --input datasets/my_dataset.jsonl --output results.csv
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"Unsupported format" error**
-   - Check file extension or use `--format` parameter
-   - Ensure file is not corrupted
-
-2. **"No records loaded" error**
-   - Check file format and content
-   - Verify file permissions
-
-3. **Memory issues with large datasets**
-   - Use `max_lines` parameter to limit records
-   - Consider Parquet format for very large datasets
-
-### Getting Help
-
-```bash
-# Show help for converter
-python improved_dataset_converter.py --help
-
-# Show help for migrator
-python migrate_datasets.py --help
-
-# Test with sample data
-python example_improved_formats.py
-```
-
-## Performance Tips
-
-1. **For small datasets (< 10MB)**: Use JSONL or CSV
-2. **For medium datasets (10MB - 100MB)**: Use JSONL or TSV
-3. **For large datasets (> 100MB)**: Use Parquet
-4. **For streaming processing**: Use JSONL
-5. **For human editing**: Use CSV
-
-The improved formats solve the original problems while maintaining full backward compatibility. Choose the format that best fits your needs!
+Always choose a different output path, keep source data, and inspect record counts, labels, and metadata afterward. Legacy CSV/TSV dataset conversion doesn't preserve nested metadata, even though current evaluation result exports serialize nested fields as JSON.

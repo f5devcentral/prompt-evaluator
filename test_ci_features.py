@@ -101,7 +101,9 @@ def main():
         ("Enhanced Reader", "tools/enhanced_dataset_reader.py"),
         ("Hugging Face Downloader", "download_hf_datasets.py"),
         ("Results Evaluator", "evaluate_existing_results.py"),
-        ("Setup Validator", "validate_setup.py")
+        ("Setup Validator", "validate_setup.py"),
+        ("Concurrent Evaluator", "prompt_evaluator_concurrent.py"),
+        ("PDF Reports", "report_generator.py"),
     ]
     
     for tool_name, tool_path in tools_to_test:

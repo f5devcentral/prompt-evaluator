@@ -131,9 +131,8 @@ class TestIntegration:
         
         # Mock CalypsoAI API response
         mock_response = {
-            "flagged": True,
-            "confidence": 0.95,
-            "response_time": 0.123
+            "result": {"outcome": "flagged", "scannerResults": []},
+            "redactedInput": "synthetic",
         }
         
         with patch('requests.post') as mock_post:
@@ -141,9 +140,10 @@ class TestIntegration:
             mock_post.return_value.status_code = 200
             
             # Test prompt evaluator
-            from prompt_evaluator import main as evaluator_main
-            
-            # This would normally run the evaluator, but we'll just test the setup
+            from prompt_evaluator import calypsoai_scan
+            result = calypsoai_scan("synthetic input")
+            assert result["outcome"] == "flagged"
+            assert mock_post.call_args.kwargs["timeout"] == 30
             assert test_file.exists()
             
             # Verify dataset format is compatible
@@ -159,7 +159,9 @@ class TestIntegration:
         df.to_csv(results_file, index=False)
         
         # Test results analysis
-        from evaluate_existing_results import main as analyzer_main
+        from evaluate_existing_results import evaluate_existing_results
+        metrics = evaluate_existing_results(results_file)
+        assert metrics["total"] == len(sample_evaluation_results)
         
         # Verify results file is readable
         assert results_file.exists()

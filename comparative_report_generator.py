@@ -42,6 +42,8 @@ from reportlab.platypus import (
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
 OUTPUT_PATH = os.path.join(RESULTS_DIR, "comparative_scanner_analysis_report.pdf")
 
+from evaluation_common import calculate_metrics, false_results, read_results, record_category, valid_response_times
+
 # Four evaluation configurations: (dataset, scanner-config) pairs
 CONFIGS = [
     {
@@ -94,97 +96,38 @@ C_PURPLE = '#9B59B6'
 # =============================================================================
 
 def load_jsonl(path):
-    records = []
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        records.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        pass
-    return records
+    """Read result rows without silently dropping malformed JSONL entries."""
+    return read_results(path) if os.path.exists(path) else []
 
 
 def compute_metrics(records):
-    """Return confusion matrix counts, derived rates, latency stats, prompt-size stats."""
-    tp = tn = fp = fn = 0
-    response_times = []
-    prompt_sizes = []
-
-    for r in records:
-        expected = str(r.get('expected', '')).strip().lower()
-        outcome  = str(r.get('outcome',  '')).strip().lower()
-
-        if   expected == 'true'  and outcome == 'flagged':  tp += 1
-        elif expected == 'false' and outcome == 'cleared':  tn += 1
-        elif expected == 'false' and outcome == 'flagged':  fp += 1
-        elif expected == 'true'  and outcome == 'cleared':  fn += 1
-
-        rt = r.get('response_time')
-        if rt is not None:
+    """Adapt shared classification to comparative charts; undefined rates stay None."""
+    scores = calculate_metrics(records)
+    tp, tn, fp, fn = (scores[key] for key in (
+        "true_positive", "true_negative", "false_positive", "false_negative"))
+    response_times = valid_response_times(records)
+    sizes = []
+    for row in records:
+        if record_category(row) in ("tp", "tn", "fp", "fn"):
             try:
-                response_times.append(float(rt))
+                sizes.append(int(row.get("prompt_size")))
             except (ValueError, TypeError):
                 pass
-
-        ps = r.get('prompt_size')
-        if ps is not None:
-            try:
-                prompt_sizes.append(int(ps))
-            except (ValueError, TypeError):
-                pass
-
-    total          = tp + tn + fp + fn
-    safe_total     = fp + tn
-    malicious_total = tp + fn
-
-    accuracy  = (tp + tn) / total if total > 0 else 0.0
-    prec_d    = tp + fp
-    precision = tp / prec_d if prec_d > 0 else None   # None when no safe prompts
-    rec_d     = tp + fn
-    recall    = tp / rec_d if rec_d > 0 else 0.0
-    pr        = precision or 0.0
-    f1_d      = pr + recall
-    f1        = 2 * pr * recall / f1_d if f1_d > 0 else 0.0
-    fpr_d     = fp + tn
-    fpr       = fp / fpr_d if fpr_d > 0 else None     # None when all malicious
-    fnr_d     = fn + tp
-    fnr       = fn / fnr_d if fnr_d > 0 else 0.0
-
     latency = {}
     if response_times:
         arr = np.array(response_times)
-        latency = dict(
-            mean  = float(np.mean(arr)),
-            min   = float(np.min(arr)),
-            max   = float(np.max(arr)),
-            p50   = float(np.percentile(arr, 50)),
-            p95   = float(np.percentile(arr, 95)),
-            p99   = float(np.percentile(arr, 99)),
-            stdev = float(np.std(arr)),
-            raw   = arr,
-        )
-
+        latency = dict(mean=float(np.mean(arr)), min=float(np.min(arr)), max=float(np.max(arr)),
+                       p50=float(np.percentile(arr, 50)), p95=float(np.percentile(arr, 95)),
+                       p99=float(np.percentile(arr, 99)), stdev=float(np.std(arr)), raw=arr)
     psize_stats = {}
-    if prompt_sizes:
-        arr = np.array(prompt_sizes)
-        psize_stats = dict(
-            mean = float(np.mean(arr)),
-            min  = int(np.min(arr)),
-            max  = int(np.max(arr)),
-            p50  = float(np.percentile(arr, 50)),
-            p95  = float(np.percentile(arr, 95)),
-        )
-
-    return dict(
-        tp=tp, tn=tn, fp=fp, fn=fn,
-        total=total, safe_total=safe_total, malicious_total=malicious_total,
-        accuracy=accuracy, precision=precision, recall=recall, f1=f1,
-        fpr=fpr, fnr=fnr,
-        latency=latency, prompt_size=psize_stats,
-    )
+    if sizes:
+        arr = np.array(sizes)
+        psize_stats = dict(mean=float(np.mean(arr)), min=int(np.min(arr)), max=int(np.max(arr)),
+                           p50=float(np.percentile(arr, 50)), p95=float(np.percentile(arr, 95)))
+    return dict(scores, tp=tp, tn=tn, fp=fp, fn=fn, safe_total=fp+tn, malicious_total=tp+fn,
+                precision=scores["precision"] if tp+fp else None, f1=scores["f1_score"],
+                fpr=fp/(fp+tn) if fp+tn else None, fnr=fn/(fn+tp) if fn+tp else 0.0,
+                latency=latency, prompt_size=psize_stats)
 
 
 def load_all_data():
@@ -193,8 +136,7 @@ def load_all_data():
         key     = cfg['key']
         records = load_jsonl(os.path.join(RESULTS_DIR, cfg['results_file']))
         metrics = compute_metrics(records)
-        fps     = load_jsonl(os.path.join(RESULTS_DIR, cfg['fp_file']))
-        fns     = load_jsonl(os.path.join(RESULTS_DIR, cfg['fn_file']))
+        fps, fns = false_results(records)
         data[key] = dict(config=cfg, records=records, metrics=metrics,
                          false_positives=fps, false_negatives=fns)
         print(f"  {key}: {len(records):,} records | "
@@ -500,7 +442,13 @@ def metrics_table(data, key):
 
     rows = [
         ['Metric', 'Value', 'Notes'],
-        ['Total Prompts',             f'{m["total"]:,}',                             ''],
+        ['Evaluated Prompts',         f'{m["total"]:,}',                             'Accuracy denominator'],
+        ['Attempted Prompts',         f'{m["attempted_count"]:,}',                   'All result rows'],
+        ['Request Errors',            f'{m["error_count"]:,}',                       'Excluded from scoring'],
+        ['Incomplete Results',        f'{m["incomplete_count"]:,}',                  'Excluded from scoring'],
+        ['Invalid Rows',              f'{m["invalid_count"]:,}',                     'Excluded from scoring'],
+        ['Provider Failures',         f'{m["provider_error_count"]:,}',              'Separate from detection'],
+        ['Opaque Scanner Evidence',   f'{m["scanner_evidence_unavailable_count"]:,}', 'Legacy aggregate scoring only'],
         ['True Positives (TP)',        f'{m["tp"]:,}',                               'Malicious correctly flagged'],
         ['True Negatives (TN)',        f'{m["tn"]:,}' if m["safe_total"] > 0 else na,''],
         ['False Positives (FP)',       f'{m["fp"]:,}' if m["safe_total"] > 0 else na,'Safe prompts incorrectly flagged'],
@@ -586,6 +534,15 @@ def s_title_page(story, styles):
 def s_executive_summary(story, styles, data):
     story.append(Paragraph('1. Executive Summary', styles['RptSection']))
     hr(story)
+    attempted = sum(item["metrics"]["attempted_count"] for item in data.values())
+    excluded = sum(item["metrics"]["excluded_count"] for item in data.values())
+    story.append(Paragraph(
+        f"Across configurations, {attempted:,} result rows were attempted and {excluded:,} "
+        "were excluded from binary scoring. Flagged, blocked, and redacted count as detections; "
+        "cleared counts as no detection. Provider failures are reported separately. "
+        "These are aggregate configured guardrail outcomes, not isolated scanner measurements. "
+        "Legacy opaque scanner cells cannot establish scanner execution completeness.",
+        styles["RptBody"]))
 
     m_lpi  = data['lmsys_pi']['metrics']
     m_lpii = data['lmsys_pii']['metrics']
@@ -627,7 +584,7 @@ def s_executive_summary(story, styles, data):
          f'(FNR {pct(m_spi["fnr"])}), predominantly jailbreak templates and adversarial suffixes.'),
 
         (f'<b>Salad + PII scanner:</b> Recovers {fn_recovered_salad} of {m_spi["fn"]:,} FNs '
-         f'({fn_recovered_salad/m_spi["fn"]*100:.1f}% FN reduction). Marginal improvement. '
+         f'({(fn_recovered_salad/m_spi["fn"]*100 if m_spi["fn"] else 0):.1f}% FN reduction). Marginal improvement. '
          f'The residual FN mass is driven by prompt-injection evasion that PII detection '
          f'cannot address.'),
 
@@ -734,7 +691,7 @@ def s_lmsys_deep_dive(story, styles, data):
         f'{m_pi["tp"]:,} ({pct(m_pi["precision"])}) are genuine threats. '
         f'Recall of {pct(m_pi["recall"])} indicates strong sensitivity, but precision of '
         f'{pct(m_pi["precision"])} means the scanner raises a false alarm for roughly '
-        f'{inv_p - 1} benign requests for every 1 real threat it catches. '
+        f'{inv_p - 1 if isinstance(inv_p, int) else "an undefined number of"} benign requests for every 1 real threat it catches. '
         f'The resulting FPR of {pct(m_pi["fpr"])} blocks {m_pi["fp"]:,} legitimate users.',
         styles['RptBody']))
 
@@ -1252,6 +1209,26 @@ def main():
 
     print('\nLoading evaluation data...')
     data = load_all_data()
+    if any(item["metrics"]["total"] == 0 for item in data.values()):
+        # The specialized narrative assumes evaluated rows in every configuration.
+        # Render coverage instead of inventing conclusions or dividing by zero.
+        styles = build_styles()
+        story = []
+        s_title_page(story, styles)
+        story.append(Paragraph(
+            "No comparative accuracy conclusion is available because at least one "
+            "configuration has no evaluable rows. Zero rates are placeholders. "
+            "Flagged, blocked, and redacted count as detections; operational errors "
+            "and invalid rows are excluded. Review coverage before comparing configurations.",
+            styles["RptBody"]))
+        for key, item in data.items():
+            story.append(Paragraph(esc(item["config"]["config_label"]), styles["RptSubsection"]))
+            story.append(metrics_table(data, key))
+            story.append(Spacer(1, 0.2 * inch))
+        os.makedirs(RESULTS_DIR, exist_ok=True)
+        SimpleDocTemplate(OUTPUT_PATH, pagesize=letter).build(story)
+        print(f"Coverage-only report generated: {OUTPUT_PATH}")
+        return
 
     print('\nGenerating charts...')
     cm_bytes          = chart_confusion_matrix_grid(data);  print('  ✓ confusion matrix grid')

@@ -25,7 +25,7 @@ the 'expected' field (true/false) when 'expected' is not already present.
 Usage:
     python convert_dataset.py --input datasets/my_dataset.jsonl
     python convert_dataset.py --input data.csv --output datasets/converted.jsonl
-    python convert_dataset.py --input data.csv --output-format pipe --legacy
+    python convert_dataset.py --input data.csv --output-format pipe
 """
 
 import argparse

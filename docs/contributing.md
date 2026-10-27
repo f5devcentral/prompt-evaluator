@@ -1,74 +1,50 @@
 # Contributing
 
-Contributions are welcome! Here are some guidelines for contributing to this project.
+Use a branch for each change and explain the user-visible behavior in your pull request. Keep code, tests, and documentation consistent. A branch name such as `feature/123-update-reports` should use the relevant issue number.
 
-## Getting Started
+## Prepare the environment
 
-1. **Fork the repository**: Create your own fork of the project to work on.
-2. **Create a feature branch**: Make your changes in a new branch.
-3. **Follow coding standards**: 
-   - Use consistent indentation (4 spaces for Python)
-   - Follow PEP 8 style guidelines
-   - Add comments for complex logic
-   - Include docstrings for functions and classes
-4. **Write tests**: Add tests for any new functionality.
-5. **Update documentation**: Keep the README and other documentation up to date.
-6. **Submit a pull request**: When your changes are ready, submit a PR with a clear description of what you've done.
+Use Python 3.11 or newer. Create the Conda environment only if it doesn't already exist, then activate it before installing packages:
 
-## Pull Request Process
+```bash
+conda create -n prompt-evaluator python=3.11
+conda activate prompt-evaluator
+python -m pip install -r requirements.txt -r requirements-test.txt
+python -m pip install -r requirements-parquet.txt
+```
 
-1. Update the README.md with details of changes if needed.
-2. Update the documentation if you're changing functionality.
-3. The PR will be merged once you have the sign-off of at least one maintainer.
+Parquet is optional for application users; installing its engine lets contributors exercise all format cases. Don't assume unconfigured pre-commit hooks are installed by the project.
 
-## Code of Conduct
+## Validate changes offline
 
-- Be respectful and inclusive
-- Provide constructive feedback
-- Focus on what is best for the community
-- Show empathy towards other community members
+```bash
+make test-core
+make test-contract
+python test_ci_features.py
+python test_concurrent_basic.py
+make lint
+```
 
-## Development Setup
+`make test-core` runs the curated groups, including the contract/workflow tests. New test files must be added to `tests/test_runner_simple.py` and the appropriate required CI job; discovery alone doesn't add them to the curated selection. API fixtures must match the documented request/response shapes. Never use customer data or credentials in fixtures.
 
-1. Clone your fork:
-   ```bash
-   git clone https://gitlab.com/your-username/prompt-evaluator.git
-   cd prompt-evaluator
-   ```
+The broader `python -m pytest tests/` suite includes known legacy reader/migration failures outside the curated selection. Don't hide failures or describe that broader suite as passing without checking it. See [testing](TESTING_GUIDE_SIMPLE.md) for scope and coverage.
 
-2. Install development dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+`make format` checks formatting but can report existing legacy differences; `make format-fix` reformats the whole tree, so don't run it casually as part of an unrelated change. Limit formatting churn to code you own. `make type-check` runs the project's broader Mypy check.
 
-3. Set up pre-commit hooks (if available):
-   ```bash
-   pre-commit install
-   ```
+## Live integration is separate
 
-## Testing
+Offline tests don't need a tenant token and block network access. `make test-concurrent`, real evaluator commands, and `validate_setup.py --check-api` contact configured services. Only use them after confirming the target environment and authorization. Start with a small synthetic dataset and an isolated project; don't make live or load tests routine pull-request prerequisites.
 
-Before submitting a pull request, make sure to:
+## Document what users need
 
-1. Run existing tests:
-   ```bash
-   python -m pytest tests/
-   ```
+Keep the [README](../README.md), [public change summary](../CHANGES_SUMMARY.md), and relevant task guides current. Explain what changed for users before discussing implementation. Put internal test mechanics in contributor documentation, not in user release highlights.
 
-2. Test your changes with sample datasets:
-   ```bash
-   python prompt_evaluator.py --input datasets/prompt_inject_dataset.csv --lines 10
-   ```
+Check documented option names against CLI help, use shipped sample paths, and label historical release records clearly. Keep the Markdown and [PDF quick reference](prompt_evaluator_cheat_sheet.pdf) aligned by regenerating the PDF from `CHEAT_SHEET.md` when it changes:
 
-3. Verify documentation is updated and accurate
+```bash
+python docs/cheat_sheet_generator.py
+```
 
-## Documentation
+Don't stage `.env`, generated evaluation results, or customer artifacts. `results/` is retained only through its empty `.gitkeep` placeholder. Review documentation and PDFs for sensitive examples before sharing.
 
-When making changes that affect functionality:
-
-1. Update the relevant documentation files in the `docs/` folder
-2. Add examples if introducing new features
-3. Update the main README if adding new major features
-4. Ensure all code examples are tested and working
-
-Thank you for your contributions!
+Use four-space Python indentation, document nontrivial behavior, add regression tests, and keep review feedback focused and respectful. Describe validation and any remaining limitations accurately in the pull request.

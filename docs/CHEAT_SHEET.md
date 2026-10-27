@@ -1,127 +1,57 @@
-# Prompt Evaluator — Quick-Start Cheat Sheet
+# Prompt evaluator quick reference
 
-## 1. Setup
-
-```bash
-git clone https://github.com/f5devcentral/prompt-evaluator.git
-cd prompt-evaluator
-```
+## Setup
 
 ```bash
-pip install -r requirements.txt
-```
-
-Create a `.env` file in the project root:
-
-```
-CALYPSOAI_URL=https://calypsoai.app
-CALYPSOAI_TOKEN=your_api_token_here
-```
-
-Verify everything is wired up:
-
-```bash
+conda create -n prompt-evaluator python=3.11
+conda activate prompt-evaluator
+python -m pip install -r requirements.txt
+# Optional Parquet engine:
+python -m pip install -r requirements-parquet.txt
 python validate_setup.py
 ```
 
-**Configure your guardrails:** In the CalypsoAI platform, enable only the guardrails relevant to your dataset. For example, if you're evaluating PII detection, enable the PII guardrails and disable others. This keeps results clean — cross-scanner interference will skew your metrics.
+Activate an existing environment instead of creating it again. Default validation is offline. Configure the confirmed tenant with `CALYPSOAI_URL=https://us1.calypsoai.app` (or EU1/custom origin) and `CALYPSOAI_TOKEN`; environment values override `.env`.
 
-## 2. Run Your First Evaluation
+## Live evaluation
 
-```bash
-# Full dataset
-python prompt_evaluator.py --input datasets/sample-datasets/pii_dataset.jsonl
-
-# Quick test — first 50 prompts only
-python prompt_evaluator.py --input datasets/sample-datasets/pii_dataset.jsonl --lines 50
-```
-
-Results land in `results/` — including an **auto-generated PDF report**.
-
-## 3. Two Evaluator Modes
-
-| Mode | Script | API | Best for |
-|------|--------|-----|----------|
-| Standard | `prompt_evaluator.py` | `/scans` | Fast bulk evaluation — returns flagged/cleared only |
-| Advanced | `prompt_evaluator_prompts.py` | `/prompts` | Deep analysis — full LLM responses and scanner details |
+Confirm the tenant/project and start with synthetic data. These commands send input to the API:
 
 ```bash
-# Advanced mode
-python prompt_evaluator_prompts.py --input datasets/sample-datasets/pii_dataset.jsonl --max-lines 50
+python prompt_evaluator.py -i datasets/sample-datasets/pii_dataset.jsonl -l 10 --project evaluation-project
+python prompt_evaluator_prompts.py -i datasets/sample-datasets/pii_dataset.jsonl -m 10 --project evaluation-project --provider evaluation-provider --results-format json
 ```
 
-## 4. Output Files
+Both accept `--timeout`, `--verbose`, `--diagnostics`, `--format-hint`, `--output`, `--results-format`, and `--format`. Prompts enables verbose by default and is the only mode with provider selection. Concurrent scans use `-c` and `--rate-limit` after infrastructure approval and interactive confirmation.
 
-Every evaluation produces four files in `results/`:
+Main output defaults: sequential/concurrent scans use JSONL; prompts uses CSV. FP/FN exports default to JSONL in every mode. All outputs live in `results/`. Custom main filenames must match the selected format and cannot collide with inputs/exports.
 
-```
-results/
-├── {dataset}_results.jsonl            # All scan results
-├── {dataset}_false_positives.jsonl    # Safe prompts incorrectly blocked
-├── {dataset}_false_negatives.jsonl    # Malicious prompts that slipped through
-└── {dataset}_report.pdf               # Visual report with charts and analysis
-```
+## Scoring
 
-## 5. Metrics Quick Reference
+Raw outcomes stay unchanged. Flagged, blocked, and redacted count as detections; cleared counts as no detection. Accuracy is `(TP + TN) / evaluated`; precision is `TP / (TP + FP)`; recall is `TP / (TP + FN)`; F1 is their harmonic mean.
 
-**Accuracy** — `(TP + TN) / Total`
-Overall correctness. Useful as a gut check, but **can mislead on imbalanced datasets** — a scanner that always says "safe" scores high if most prompts are safe.
+Always inspect attempted, evaluated, error, incomplete, and invalid counts. Provider failures are separate. No evaluable rows means no accuracy estimate. Aggregate prompt-pipeline outcomes aren't individual-scanner accuracy. Historical opaque scanner cells can't establish execution completeness.
 
-**Precision** — `TP / (TP + FP)`
-"Of everything the scanner flagged, how much was actually bad?"
-Low precision = too many false blocks = **frustrated legitimate users**.
-
-**Recall** — `TP / (TP + FN)`
-"Of everything that was actually bad, how much did we catch?"
-Low recall = threats slipping through = **security gap**.
-
-**F1 Score** — `2 × (Precision × Recall) / (Precision + Recall)`
-Harmonic mean of precision and recall. **The single best metric when you need one number** to compare scanner configurations.
-
-### Which metric matters most?
-
-- **Security-first** (content moderation, PII detection) — prioritize **recall**. Missing a real threat is worse than a false alarm.
-- **UX-first** (customer-facing chatbot) — prioritize **precision**. Blocking legitimate users erodes trust fast.
-- **General comparison** — use **F1 score** as the tiebreaker.
-
-### Benchmarks
-
-| Metric | Good | Warning |
-|--------|------|---------|
-| Accuracy | > 85% | < 70% |
-| Precision | > 90% | < 60% |
-| Recall | > 90% | < 60% |
-| F1 Score | > 80% | Large gap between precision and recall |
-
-## 6. Generating Reports
-
-Reports are **auto-generated** after every evaluation. To regenerate manually:
+## Offline analysis
 
 ```bash
-# Use the dataset NAME only — no path, no extension, no "_results" suffix
+python evaluate_existing_results.py -i results/pii_dataset_results.jsonl
 python report_generator.py --dataset pii_dataset
+python report_generator.py --input results/custom.jsonl
 ```
 
-## 7. Re-Analyze Without Re-Scanning
+Sequential scans and prompts generate PDFs automatically; concurrent scans don't. `make test-concurrent` is live evaluation, not an offline test.
 
-Already have results? Recalculate metrics without burning API calls:
+Results and PDF examples can contain PII. Additional content-rich diagnostics require `--diagnostics`; review access, retention, and content before sharing.
+
+## Development checks
 
 ```bash
-python evaluate_existing_results.py --input results/pii_dataset_results.jsonl
+python -m pip install -r requirements-test.txt
+make test-core
+make test-contract
 ```
 
-## 8. Common Flags
+Run these inside the project Conda environment. Optional Parquet cases require its engine. Generated results stay excluded from Git; only an empty directory placeholder is tracked.
 
-| Flag | Standard (`prompt_evaluator.py`) | Advanced (`prompt_evaluator_prompts.py`) |
-|------|----------------------------------|------------------------------------------|
-| Input file | `--input` / `-i` | `--input` / `-i` |
-| Limit rows | `--lines` / `-l` | `--max-lines` / `-m` |
-| Output file | `--output` / `-o` | `--output` / `-o` |
-| FP/FN format | `--format` / `-f` | `--format` / `-f` |
-| Results format | `--results-format` / `-r` | `--results-format` / `-r` |
-
-Supported output formats: **json** (default), **csv**, **tsv**, **parquet**
-
----
-
-*For deeper dives: [Evaluation Metrics](evaluation-metrics.md) · [PDF Reports](pdf-reports.md) · [Usage Guide](usage.md) · [Troubleshooting](troubleshooting.md)*
+See [usage](usage.md), [metrics](evaluation-metrics.md), [reports](pdf-reports.md), and [troubleshooting](troubleshooting.md).

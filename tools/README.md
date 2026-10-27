@@ -1,159 +1,86 @@
-# Dataset Tools
+# Dataset tools
 
-This directory contains tools for working with improved dataset formats and migration.
+Run these examples from the repository root with the project Conda environment active. These tools prepare local input data; they don't call the guardrails API. Some warnings and demos print prompt content, so protect logs and use synthetic files when trying examples.
 
-## 🆕 New Dataset Tools
-
-### Core Tools
-
-#### `improved_dataset_converter.py`
-Convert datasets between different formats with proper escaping and validation.
+## Simple conversion
 
 ```bash
-# Convert a single dataset
-python improved_dataset_converter.py input.csv output.jsonl --output-format jsonl
-
-# Convert with validation
-python improved_dataset_converter.py input.csv output.jsonl --validate
-
-# Auto-detect input format
-python improved_dataset_converter.py input.csv output.jsonl
+python convert_dataset.py --input source.csv --output datasets/source_converted.jsonl
+python validate_setup.py --dataset datasets/source_converted.jsonl
 ```
 
-**Supported Formats:**
-- JSONL (recommended)
-- CSV with proper escaping
-- TSV (tab-separated)
-- Parquet (binary format)
-- Legacy pipe-delimited
+The root converter accepts CSV/JSONL and writes JSONL by default. It can map malicious/benign `original_label` values when `expected` is missing. It isn't an interactive converter and doesn't preserve every arbitrary source column. Choose a distinct output path and keep originals.
 
-#### `enhanced_dataset_reader.py`
-Unified dataset reader that auto-detects formats and handles all special characters.
+## Advanced conversion in Python
+
+The advanced converter CLI currently has a format-argument ordering bug. Use keyword arguments through its Python API instead of the old positional CLI examples:
 
 ```python
-from enhanced_dataset_reader import EnhancedDatasetReader
+from tools.improved_dataset_converter import DatasetConverter
 
-# Auto-detect format and read
-reader = EnhancedDatasetReader()
-records = reader.read_dataset("my_dataset.jsonl")
-
-# Specify format explicitly
-records = reader.read_dataset("my_dataset.csv", format_hint="csv")
-
-# Limit number of records
-records = reader.read_dataset("my_dataset.jsonl", max_lines=100)
+converter = DatasetConverter()
+output = converter.convert_dataset(
+    "source.tsv",
+    "converted.jsonl",
+    input_format="tsv",
+    output_format="jsonl",
+)
+stats = converter.validate_dataset(output, format_hint="jsonl")
+if not isinstance(stats, dict) or stats.get("error"):
+    raise ValueError("Converted dataset needs review")
+print(stats["total_records"])
 ```
 
-#### `migrate_datasets.py`
-Batch migration tool for converting existing datasets to improved formats.
+Input support here is JSONL, CSV, TSV, and legacy pipe. Parquet is an export option for this converter, not an input branch. The separate enhanced reader and evaluators do read Parquet. Install the optional engine from `requirements-parquet.txt` when needed.
+
+JSONL conversion can retain structured metadata. This older converter's CSV/TSV output projects a fixed set of columns and drops nested metadata; don't assume lossless conversion. It doesn't create backups, prevent same-path overwrites, or make validation errors impossible. These limitations are separate from the newer evaluation result writers.
+
+## Read datasets
+
+```python
+from tools.enhanced_dataset_reader import EnhancedDatasetReader
+
+records = EnhancedDatasetReader().read_dataset(
+    "dataset.jsonl", max_lines=20
+)
+for record in records:
+    print(record.id, record.expected)
+```
+
+The reader returns a list of `PromptRecord` objects; access attributes such as `.prompt`, `.expected`, and `.metadata`. Use `load_dataset_enhanced()` for dictionary records. CSV/TSV require headers. Use `format_hint="pipe"` for legacy pipe-delimited `.csv` input. JSONL supports complex text, but these readers aren't bounded-memory streaming iterators.
+
+For local CLI inspection:
 
 ```bash
-# List all datasets and their formats
-python migrate_datasets.py --list
-
-# Migrate all datasets to JSONL format
-python migrate_datasets.py --all --output-format jsonl
-
-# Migrate a specific dataset
-python migrate_datasets.py --input datasets/my_dataset.csv --output-format jsonl
-
-# Migrate without creating backups
-python migrate_datasets.py --all --no-backup
+python -m tools.enhanced_dataset_reader dataset.jsonl --max-lines 2
 ```
 
-### Demo Tools
+It prints prompt samples. Evaluators use `--format-hint` to choose input format; this standalone reader uses `--format`.
 
-#### `demo_improved_formats.py`
-Complete demonstration of the improved dataset formats solution.
+## Legacy migration
 
 ```bash
-# Run the full demonstration
-python demo_improved_formats.py
+python -m tools.migrate_datasets --list
+python -m tools.migrate_datasets --help
 ```
 
-**Shows:**
-- Problems with original pipe-delimited format
-- How new formats solve these problems
-- Migration process
-- Usage examples
-- Format comparison
+Use module invocation because the migrator imports other tools relatively. Its inventory is limited to direct `datasets/*.csv` files. Batch migration skips those it doesn't detect as pipe-delimited; it doesn't recursively migrate every supported format.
 
-#### `example_improved_formats.py`
-Interactive example showing different dataset formats.
+If you choose to migrate a confirmed legacy pipe file, work on a copy, check its target filename, and retain a backup:
 
 ```bash
-# Run the example
-python example_improved_formats.py
+python -m tools.migrate_datasets --input legacy_copy.csv --output-format jsonl
 ```
 
-**Features:**
-- Creates sample datasets in all formats
-- Demonstrates reading and writing
-- Shows file size comparison
-- Interactive cleanup
+Migration assumes pipe input and derives output by replacing the extension. Selecting the same extension can overwrite the source. Backups are enabled by default, but an existing backup isn't refreshed automatically. Validation returns statistics or errors and isn't a guarantee of a valid migration. There is no automatic rollback command; restore a verified backup manually when needed. Avoid `--no-backup` for data you need to retain.
 
-## Format Comparison
+## Demonstrations
 
-| Format | Human Readable | Special Chars | Metadata | Size | Performance |
-|--------|----------------|---------------|----------|------|-------------|
-| JSONL | ✅ | ✅ | ✅ | Medium | Fast |
-| CSV | ✅ | ⚠️ | ✅ | Small | Fast |
-| TSV | ✅ | ⚠️ | ✅ | Small | Fast |
-| Pipe | ✅ | ❌ | ❌ | Small | Slow |
-| Parquet | ❌ | ✅ | ✅ | Very Small | Very Fast |
+The legacy demonstration programs write example files, and one offers interactive cleanup. Use a disposable copy of the project and synthetic data if exploring them:
 
-## Migration Workflow
-
-### 1. Analyze Current Datasets
 ```bash
-python migrate_datasets.py --list
+python -m tools.demo_improved_formats
+python -m tools.example_improved_formats
 ```
 
-### 2. Migrate to Better Format
-```bash
-# Migrate all datasets to JSONL (recommended)
-python migrate_datasets.py --all --output-format jsonl
-
-# Or migrate a specific dataset
-python migrate_datasets.py --input datasets/my_dataset.csv --output-format jsonl
-```
-
-### 3. Validate Migration
-```bash
-python improved_dataset_converter.py datasets/my_dataset.jsonl --validate
-```
-
-### 4. Continue Using Existing Scripts
-```bash
-# No changes needed to existing code!
-python prompt_evaluator.py --input datasets/my_dataset.jsonl
-```
-
-## Benefits
-
-### JSONL Format (Recommended)
-- ✅ No escaping issues with any special characters
-- ✅ Supports metadata (IDs, timestamps, categories)
-- ✅ Easy to parse programmatically
-- ✅ Streaming processing support
-- ✅ Human-readable
-
-### Backward Compatibility
-- ✅ All existing scripts work unchanged
-- ✅ Reads both old and new formats
-- ✅ Gradual migration supported
-- ✅ No breaking changes
-
-## Safety Features
-
-- **Non-destructive**: Original files are never modified
-- **Automatic backups**: Creates backup copies by default
-- **Validation**: Validates each conversion
-- **Rollback**: Easy to revert if needed
-
-## Need Help?
-
-- Check the main [Improved Dataset Formats documentation](../docs/IMPROVED_DATASET_FORMATS.md)
-- Run `python migrate_datasets.py --help` for command options
-- Run `python improved_dataset_converter.py --help` for conversion options
-- Use the demo tools to see examples in action
+They're demonstrations, not a substitute for the curated tests or a guarantee that every legacy migration path works. For current application behavior, use [dataset guidance](../docs/datasets.md), [format guidance](../docs/IMPROVED_DATASET_FORMATS.md), and [offline tests](../docs/TESTING_GUIDE_SIMPLE.md).

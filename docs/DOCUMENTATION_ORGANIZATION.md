@@ -1,152 +1,23 @@
-# Documentation Organization
+# Documentation organization
 
-This document explains how the documentation is organized after the addition of improved dataset formats.
+Organize documentation by the task a reader wants to complete. The [documentation index](README.md) is the navigation entry point, and the [project README](../README.md) provides a working introduction.
 
-## 📁 Directory Structure
+## User-facing information
 
-```
-prompt-evaluator/
-├── README.md                           # Main project README with "What's New" section
-├── docs/                               # Core documentation
-│   ├── README.md                       # Documentation index
-│   ├── installation.md                 # Setup instructions
-│   ├── usage.md                       # Usage examples
-│   ├── datasets.md                    # Dataset management
-│   ├── IMPROVED_DATASET_FORMATS.md    # New dataset formats guide
-│   ├── troubleshooting.md            # Common issues
-│   └── contributing.md                # Contribution guide
-├── tools/                              # New dataset tools
-│   ├── README.md                      # Tools documentation
-│   ├── improved_dataset_converter.py  # Format converter
-│   ├── enhanced_dataset_reader.py     # Unified reader
-│   ├── migrate_datasets.py           # Migration tool
-│   ├── example_improved_formats.py   # Interactive example
-│   └── demo_improved_formats.py       # Complete demonstration
-└── datasets/                          # Dataset files
-    ├── *.csv                          # Original datasets
-    ├── *.jsonl                        # Migrated datasets
-    └── *.backup.*                     # Backup files
-```
+[What's changed](../CHANGES_SUMMARY.md) explains user-visible improvements and compatibility notes without internal implementation or investigation details. [Installation](installation.md) and [usage](usage.md) cover setup and current commands. [Dataset guidance](datasets.md) and [format guidance](IMPROVED_DATASET_FORMATS.md) explain inputs and utility limitations.
 
-## 📚 Documentation Hierarchy
+[Metrics](evaluation-metrics.md), [result formats](results-format-changes.md), and [PDF reports](pdf-reports.md) explain what outputs mean, which defaults apply, and how to revisit saved work. Keep sensitive-data guidance close to any workflow that creates or shares artifacts.
 
-### 1. Main README (`README.md`)
-- **Purpose**: Project overview and quick start
-- **New Content**: "What's New" section highlighting improvements
-- **Key Features**: Updated feature list with new capabilities
-- **Quick Migration**: Step-by-step migration commands
+The [quick reference](CHEAT_SHEET.md) is the source for the generated [PDF cheat sheet](prompt_evaluator_cheat_sheet.pdf). Regenerate it with `python docs/cheat_sheet_generator.py` when its content changes.
 
-### 2. Core Documentation (`docs/`)
-- **`docs/README.md`**: Documentation index and navigation
-- **`docs/installation.md`**: Setup instructions (unchanged)
-- **`docs/usage.md`**: Usage examples (unchanged)
-- **`docs/datasets.md`**: Dataset management (unchanged)
-- **`docs/IMPROVED_DATASET_FORMATS.md`**: New comprehensive guide
-- **`docs/troubleshooting.md`**: Common issues (unchanged)
-- **`docs/contributing.md`**: Contribution guide (unchanged)
+## Contributor information
 
-### 3. Tools Documentation (`tools/`)
-- **`tools/README.md`**: Complete tools documentation
-- **Individual tool files**: Self-documenting with help text
+[Testing](TESTING_GUIDE_SIMPLE.md), [contributing](contributing.md), and the [tools README](../tools/README.md) describe development checks and utility interfaces. Place schema filenames, CI gates, and implementation details here when they're needed by contributors, rather than making them the public release narrative.
 
-## 🆕 New Documentation Features
+## Historical records
 
-### What's New Section
-The main README now includes a prominent "What's New" section that:
-- Highlights the improved dataset formats
-- Lists new tools and their purposes
-- Provides quick migration commands
-- Emphasizes backward compatibility
+Keep release dates and original release records intact. Mark [v2.0 release notes](RELEASE_NOTES_v2.0.md) as historical and link current instructions; old commands, roadmap items, or compatibility promises aren't guarantees of today's behavior.
 
-### Improved Dataset Formats Guide
-Comprehensive documentation covering:
-- Problems with original format
-- New format options (JSONL, CSV, TSV, Parquet)
-- Migration process
-- Usage examples
-- Format comparison
-- Best practices
+## Maintenance
 
-### Tools Documentation
-Dedicated documentation for new tools:
-- Command-line usage examples
-- Python API examples
-- Format comparison table
-- Migration workflow
-- Safety features
-
-## 🔄 Migration Documentation
-
-### User Journey
-1. **Discovery**: Users see "What's New" in main README
-2. **Learning**: Read improved dataset formats guide
-3. **Tools**: Explore tools documentation
-4. **Action**: Follow migration commands
-5. **Validation**: Use demo tools to verify
-
-### Documentation Flow
-```
-README.md (What's New)
-    ↓
-docs/IMPROVED_DATASET_FORMATS.md (Detailed Guide)
-    ↓
-tools/README.md (Tool Usage)
-    ↓
-tools/demo_improved_formats.py (Hands-on Demo)
-```
-
-## 📖 Documentation Principles
-
-### 1. Progressive Disclosure
-- Start with high-level overview in main README
-- Provide detailed information in dedicated guides
-- Include hands-on examples and demos
-
-### 2. Backward Compatibility
-- All existing documentation remains unchanged
-- New content is additive, not replacing
-- Clear migration path provided
-
-### 3. Multiple Entry Points
-- Main README for quick overview
-- Dedicated guides for detailed information
-- Tool-specific documentation for implementation
-- Interactive demos for hands-on learning
-
-### 4. User-Centric Organization
-- Organized by user needs, not technical structure
-- Clear navigation between related topics
-- Consistent formatting and structure
-
-## 🎯 Key Messages
-
-### For Existing Users
-- "Your existing code works unchanged"
-- "Safe migration with automatic backups"
-- "Gradual adoption supported"
-
-### For New Users
-- "Multiple format options available"
-- "Proper handling of special characters"
-- "Metadata support for rich datasets"
-
-### For Developers
-- "Comprehensive API documentation"
-- "Extensible format support"
-- "Backward compatibility maintained"
-
-## 📋 Maintenance
-
-### Documentation Updates
-- Keep "What's New" section current
-- Update tool documentation with new features
-- Maintain format comparison tables
-- Keep migration examples current
-
-### User Feedback
-- Monitor for common questions
-- Update troubleshooting guide
-- Improve examples based on usage
-- Add new use cases as they emerge
-
-This organization ensures that users can easily discover, understand, and use the new dataset format improvements while maintaining full backward compatibility with existing workflows.
+Check option names, default output formats, shipped sample paths, and link targets when a workflow changes. Use file or heading links instead of brittle line numbers and file-length claims. Document known limitations rather than advertising unverified streaming, rollback, performance, or metadata guarantees. No real tenant calls are needed to validate documentation links or CLI option names.

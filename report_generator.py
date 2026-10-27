@@ -47,6 +47,9 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 
+from evaluation_common import calculate_metrics, false_results, latency_statistics, read_results
+
+
 class PDFReportGenerator:
     """Generates professional PDF reports from evaluation results."""
     
@@ -134,18 +137,19 @@ class PDFReportGenerator:
         
         # Create confusion matrix data
         matrix = [
-            [metrics['true_positive'], metrics['false_positive']],
-            [metrics['false_negative'], metrics['true_negative']]
+            [metrics['true_positive'], metrics['false_negative']],
+            [metrics['false_positive'], metrics['true_negative']]
         ]
         
         # Plot confusion matrix
-        im = ax.imshow(matrix, cmap='RdYlGn', aspect='auto', vmin=0, vmax=max(metrics.values()))
+        matrix_max = max(1, *(value for row in matrix for value in row))
+        im = ax.imshow(matrix, cmap='RdYlGn', aspect='auto', vmin=0, vmax=matrix_max)
         
         # Add text annotations
         for i in range(2):
             for j in range(2):
                 text = ax.text(j, i, matrix[i][j], ha="center", va="center", 
-                              color="white" if matrix[i][j] > max(metrics.values())/2 else "black",
+                              color="white" if matrix[i][j] > matrix_max/2 else "black",
                               fontsize=14, fontweight='bold')
         
         # Set labels
@@ -221,7 +225,13 @@ class PDFReportGenerator:
             ['True Negatives', f"{metrics['true_negative']}"],
             ['False Positives', f"{metrics['false_positive']}"],
             ['False Negatives', f"{metrics['false_negative']}"],
-            ['Total Samples', f"{metrics['total']}"]
+            ['Evaluated Samples', f"{metrics['total']}"],
+            ['Attempted Samples', str(metrics.get('attempted_count', metrics['total']))],
+            ['Request Errors', str(metrics.get('error_count', 0))],
+            ['Incomplete Guardrail Results', str(metrics.get('incomplete_count', 0))],
+            ['Invalid Rows', str(metrics.get('invalid_count', 0))],
+            ['Provider Failures (separate)', str(metrics.get('provider_error_count', 0))],
+            ['Opaque Legacy Scanner Evidence', str(metrics.get('scanner_evidence_unavailable_count', 0))]
         ]
         
         table = Table(data, colWidths=[3*inch, 2*inch])
@@ -318,7 +328,7 @@ class PDFReportGenerator:
         return img_buffer
     
     def generate_report(self, dataset_name, metrics, false_positives=None, false_negatives=None, 
-                       latency_stats=None, output_path=None):
+                       latency_stats=None, output_path=None, evaluation_mode="legacy"):
         """
         Generate a comprehensive PDF report.
         
@@ -334,7 +344,7 @@ class PDFReportGenerator:
         if output_path is None:
             output_path = os.path.join(self.results_dir, f"{dataset_name}_report.pdf")
         
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
         
         # Create PDF document
         doc = SimpleDocTemplate(output_path, pagesize=letter,
@@ -347,7 +357,7 @@ class PDFReportGenerator:
         story.append(Spacer(1, 2*inch))
         story.append(Paragraph("Prompt Evaluator", self.styles['CustomTitle']))
         story.append(Spacer(1, 0.5*inch))
-        story.append(Paragraph(f"Evaluation Report: {dataset_name}", 
+        story.append(Paragraph(f"Evaluation Report: {self._escape_text(dataset_name)}",
                               self.styles['CustomTitle']))
         story.append(Spacer(1, 0.3*inch))
         story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", 
@@ -365,6 +375,22 @@ class PDFReportGenerator:
         ))
         story.append(Spacer(1, 0.2*inch))
         
+        scope = (
+            "Aggregate prompt pipeline outcomes, including request and response guardrails; "
+            "these are not individual-scanner accuracy measurements."
+            if evaluation_mode == "prompts" else
+            "Aggregate scan outcomes for the selected project."
+            if evaluation_mode == "scans" else
+            "Legacy or mixed configuration: the original evaluation scope is unavailable."
+        )
+        story.append(Paragraph(
+            f"{scope} Binary scoring counts flagged, blocked, and redacted as detections. "
+            f"Attempted: {metrics.get('attempted_count', metrics['total'])}; "
+            f"evaluated: {metrics['total']}; excluded: {metrics.get('excluded_count', 0)}. "
+            "Operational errors and invalid rows are excluded from accuracy, not counted as safe. "
+            "When no rows are evaluable, displayed zero rates are placeholders, not an accuracy estimate.",
+            self.styles['BodyText']
+        ))
         # Summary metrics
         summary_text = (
             f"<b>Overall Accuracy:</b> {metrics['accuracy']:.2%}<br/>"
@@ -560,122 +586,29 @@ class PDFReportGenerator:
         return output_path
 
 
-def load_evaluation_results(dataset_name, results_dir="results"):
-    """Load evaluation results from files."""
-    results = {
-        'metrics': None,
-        'false_positives': None,
-        'false_negatives': None,
-        'latency_stats': None
-    }
-    
-    # Try to load from JSONL files
-    fp_file = os.path.join(results_dir, f"{dataset_name}_false_positives.jsonl")
-    fn_file = os.path.join(results_dir, f"{dataset_name}_false_negatives.jsonl")
-    
-    if os.path.exists(fp_file):
-        with open(fp_file, 'r') as f:
-            results['false_positives'] = [json.loads(line) for line in f if line.strip()]
-    
-    if os.path.exists(fn_file):
-        with open(fn_file, 'r') as f:
-            results['false_negatives'] = [json.loads(line) for line in f if line.strip()]
-    
-    # Try to load results file - check for JSONL first, then CSV
-    jsonl_file = os.path.join(results_dir, f"{dataset_name}_results.jsonl")
-    csv_file = os.path.join(results_dir, f"{dataset_name}_results.csv")
-    tsv_file = os.path.join(results_dir, f"{dataset_name}_results.tsv")
-    parquet_file = os.path.join(results_dir, f"{dataset_name}_results.parquet")
-    
-    data = None
-    
-    # Try JSONL format first (new default)
-    if os.path.exists(jsonl_file):
-        with open(jsonl_file, 'r', encoding='utf-8') as f:
-            data = [json.loads(line) for line in f if line.strip()]
-    
-    # Fall back to CSV format
-    elif os.path.exists(csv_file):
-        with open(csv_file, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            data = list(reader)
-    
-    # Fall back to TSV format
-    elif os.path.exists(tsv_file):
-        with open(tsv_file, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f, delimiter='\t')
-            data = list(reader)
-    
-    # Fall back to Parquet format
-    elif os.path.exists(parquet_file):
-        try:
-            import pandas as pd
-            df = pd.read_parquet(parquet_file)
-            data = df.to_dict('records')
-        except ImportError:
-            print("Warning: pandas not available to read parquet file.")
-    
-    if data:
-        # Calculate metrics
-        metrics = {
-            'true_positive': 0,
-            'true_negative': 0,
-            'false_positive': 0,
-            'false_negative': 0,
-            'total': len(data)
-        }
-        
-        response_times = []
-        
-        for row in data:
-            expected = str(row.get('expected', '')).lower()
-            outcome = str(row.get('outcome', '')).lower()
-            
-            if expected == 'true' and outcome == 'flagged':
-                metrics['true_positive'] += 1
-            elif expected == 'false' and outcome == 'cleared':
-                metrics['true_negative'] += 1
-            elif expected == 'false' and outcome == 'flagged':
-                metrics['false_positive'] += 1
-            elif expected == 'true' and outcome == 'cleared':
-                metrics['false_negative'] += 1
-            
-            # Collect response times
-            if 'response_time' in row and row['response_time']:
-                try:
-                    response_times.append(float(row['response_time']))
-                except (ValueError, TypeError):
-                    pass
-        
-        # Calculate derived metrics
-        total = metrics['total']
-        if total > 0:
-            metrics['accuracy'] = (metrics['true_positive'] + metrics['true_negative']) / total
-            precision_denom = metrics['true_positive'] + metrics['false_positive']
-            metrics['precision'] = metrics['true_positive'] / precision_denom if precision_denom > 0 else 0
-            recall_denom = metrics['true_positive'] + metrics['false_negative']
-            metrics['recall'] = metrics['true_positive'] / recall_denom if recall_denom > 0 else 0
-            f1_denom = metrics['precision'] + metrics['recall']
-            metrics['f1_score'] = 2 * metrics['precision'] * metrics['recall'] / f1_denom if f1_denom > 0 else 0
-        else:
-            metrics['accuracy'] = metrics['precision'] = metrics['recall'] = metrics['f1_score'] = 0
-        
-        results['metrics'] = metrics
-        
-        # Calculate enhanced latency stats with percentiles
-        if response_times:
-            results['latency_stats'] = {
-                'average_latency': np.mean(response_times),
-                'min_latency': np.min(response_times),
-                'max_latency': np.max(response_times),
-                'p50_latency': np.percentile(response_times, 50),
-                'p95_latency': np.percentile(response_times, 95),
-                'p99_latency': np.percentile(response_times, 99),
-                'total_prompts': len(data)
-                # Note: throughput and total_time not available when loading from files
-            }
-    
-    return results
+def load_evaluation_results(dataset_name, results_dir="results", input_file=None):
+    """Recompute metrics and examples from one result file, never stale FP/FN sidecars.
+
+    An explicit input filename supports custom evaluator output names. Default
+    dataset lookup retains the historical JSONL/CSV/TSV/Parquet precedence.
+    """
+    result = {"metrics": None, "false_positives": None, "false_negatives": None,
+              "latency_stats": None, "evaluation_mode": "legacy"}
+    candidates = [input_file] if input_file else [
+        os.path.join(results_dir, f"{dataset_name}_results.{extension}")
+        for extension in ("jsonl", "csv", "tsv", "parquet")
+    ]
+    for filename in candidates:
+        if not os.path.isfile(filename):
+            continue
+        records = read_results(filename)
+        fps, fns = false_results(records)
+        modes = {row.get("evaluation_mode") for row in records if row.get("evaluation_mode")}
+        result.update(metrics=calculate_metrics(records), false_positives=fps,
+                      false_negatives=fns, latency_stats=latency_statistics(records),
+                      evaluation_mode=next(iter(modes)) if len(modes) == 1 else "legacy")
+        break
+    return result
 
 
 def main():
@@ -699,7 +632,10 @@ def main():
         help='Output PDF path (default: results/{dataset}_report.pdf)'
     )
     
+    parser.add_argument('--input', '-i', help='Explicit results file, including custom output names')
     args = parser.parse_args()
+    if args.input and not args.dataset:
+        args.dataset = os.path.splitext(os.path.basename(args.input))[0].removesuffix('_results')
     
     if not args.dataset:
         # Try to find dataset files in results directory
@@ -736,7 +672,7 @@ def main():
     
     # Load results
     print(f"Loading results for dataset: {args.dataset}")
-    results = load_evaluation_results(args.dataset, args.results_dir)
+    results = load_evaluation_results(args.dataset, args.results_dir, args.input)
     
     if not results['metrics']:
         print("Error: Could not load evaluation results.")
@@ -751,7 +687,8 @@ def main():
         false_positives=results['false_positives'],
         false_negatives=results['false_negatives'],
         latency_stats=results['latency_stats'],
-        output_path=args.output
+        output_path=args.output,
+        evaluation_mode=results['evaluation_mode']
     )
     
     print(f"\n✓ Report generated successfully!")
